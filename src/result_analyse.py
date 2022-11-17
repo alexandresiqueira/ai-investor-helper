@@ -20,22 +20,70 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import constants
 import matplotlib.lines as mlines
+import os.path
 np.set_printoptions(threshold=None, precision=4)
 pd.set_option('display.max_columns', 700)
 pd.set_option('display.max_rows', 500)
 pd.set_option('precision', 4)
+pd.set_option('display.width', 1000)
 
 
 
 def read_resultado():
-    resultado = pd.read_csv(constants.DATA_PATH+constants.FILE_NAME_RESULTADO, sep=constants.CSV_SEPARATOR)
+    fname = constants.DATA_PATH+constants.FILE_NAME_RESULTADO
+    
+    if os.path.isfile(fname):
+        resultado = pd.read_csv(fname, sep=constants.CSV_SEPARATOR)
          
-    return resultado
+        return resultado
+    print("ALERT: - ARQUIVO DE RESULTADOS NÃO LOCALIZADO ", fname)
+
+#Faz print dos resultados obtidos para os ativoss, algoritmos, n_res, etc.
+def print_res_alg():
+    res = read_resultado()
+    #ATRIB = "% PRED/HOLD" #
+    ATRIB = "SCO_VALID"
+    res["% PRED/HOLD"] = ((res["VALID_BAL_PRED"]/res["VALID_BAL_HOLD"])-1)*100
+
+    #res = res.loc[(res["ALG"] != "SVM") & (res["ALG"] != "RFC")]
+
+    #res = res.loc[(res["ATIVO"] != "VALE3") ]
+    atributos = [ "ATIVO", "LOG","ALG","N_RES","N_PER", "TEST_SIZE"]
+    res2 = res.agg({ATRIB: ['mean', 'min', 'max', 'count', 'std']})
+    print(res2)
+    for atrib in atributos:
+        res2 = res.groupby([atrib]).agg({ATRIB: ['mean', 'min', 'max', 'count', 'std']})
+        res2.columns = ['mean', 'min', 'max', 'count', 'std']
+        res2 = res2.reset_index()
+        res2 = res2.sort_values(by='mean', axis=0, ascending=False, inplace=False,  
+                         kind='quicksort', na_position='last')  
+        print("---------------------------------------")
+        print(res2)
+    """
+    res2 = res.groupby(["ALG", "LOG"]).agg({ATRIB: ['mean', 'min', 'max', 'count']})
+    print(res2)
+    """
+    res2 = res.groupby(["ATIVO", "ALG", "N_RES", "LOG"]).agg({ATRIB: ['mean', 'min', 'max', 'count', 'std']})
+    res2.columns = ['mean', 'min', 'max', 'count', 'std']
+    res2 = res2.reset_index()
+    res2 = res2.sort_values(by='mean', axis=0, ascending=False, inplace=False,  
+                     kind='quicksort', na_position='last')  
+    print(res2.head(50))
+    
+    res3 = res.groupby(["ALG","N_RES", "LOG"]).agg({ATRIB: ['mean', 'min', 'max', 'count']})
+    res3.columns = ['mean', 'min', 'max', 'count']
+    res3 = res3.reset_index()
+    res3 = res3.sort_values(by='mean', axis=0, ascending=False, inplace=False,  
+                     kind='quicksort', na_position='last')  
+
+    print(res3)
 
 
+
+#identifica máximo desempenho por critério: "SCO_TEST", "VALID_BAL_PRED", "SCO_VALID"
 def compute_bets_results():
     res = read_resultado()
-    #resp = res.groupby(['ATIVO'], sort=False)['SCO_VALID'].max()
+
     bestRes = pd.Series(dtype=float)
     for criteria in constants.BY_CRITERIA_RANK:
         idx = res.groupby(['ATIVO'])[criteria].transform(max) == res[criteria]
@@ -55,9 +103,40 @@ def compute_bets_results():
             bestRes = resp
         else:
             bestRes = bestRes.append(resp)
+    bestRes["% PRED/HOLD"] = ((bestRes["VALID_BAL_PRED"]/bestRes["VALID_BAL_HOLD"])-1)*100
+    #print(bestRes.loc[(bestRes["CRITERIA"] == "SCO_VALID")]["% PRED/HOLD"].mean())
     
+    #Análise apenas por score em base de validação:
+    bestRes = bestRes.loc[(bestRes["CRITERIA"] == "SCO_VALID")]
+    bestRes = bestRes.drop("CRITERIA", axis=1)
+    bestRes = bestRes.sort_values(by='SCO_VALID', axis=0, ascending=False, inplace=False,  
+                     kind='quicksort', na_position='last')
+    print("\n##########################################  MÁXIMOS DESEMPENHOS POR ATIVO  ########################################\n")
     print(bestRes)
+    bestRes.to_excel(constants.DATA_PATH+"report-ativos.xlsx")
     
+    bestRes2 = bestRes.agg({"SCO_TEST": ['mean', 'min', 'max', 'count'],"SCO_VALID": ['mean', 'min', 'max', 'count'], "% PRED/HOLD": ['mean', 'min', 'max', 'count']})
+    print("\n########### MÉDIA GERAL DOS MELHORES RESULTADOS DE VALIDAÇÃO ##########")
+    print(bestRes2)
+
+    atributos = [ "ALG","N_RES","N_PER", "TEST_SIZE", "LOG"]
+    for atrib in atributos:
+
+        res3 = bestRes.groupby([atrib]).agg({"SCO_TEST": ['mean', 'min', 'max', 'count'],"SCO_VALID": ['mean', 'min', 'max', 'count'], "% PRED/HOLD": ['mean', 'min', 'max', 'count']})
+        """res3.columns = ['mean', 'min', 'max', 'count']
+        res3 = res3.reset_index()
+        res3 = res3.sort_values(by='mean', axis=0, ascending=False, inplace=False,  
+                         kind='quicksort', na_position='last')  
+        """
+        print("\n\n############### MÉDIA GERAL DOS MELHORES RESULTADOS DE VALIDAÇÃO POR ",atrib," ##################")
+        print(res3)
+        res3.to_excel(constants.DATA_PATH+"report-"+atrib+".xlsx")
+
+    bestRes2 = bestRes.groupby(["ALG", "LOG"]).agg({"SCO_TEST": ['mean', 'min', 'max', 'count'],"SCO_VALID": ['mean', 'min', 'max', 'count'], "% PRED/HOLD": ['mean', 'min', 'max', 'count']})
+    print("\n\n######### MÉDIA GERAL DOS MELHORES RESULTADOS DE VALIDAÇÃO POR ALGORITMO E NORMALIZ. ##########")
+    print(bestRes2)
+
+
     return bestRes
 
 #Gera histograma do score de test (SCO_TEST) dos resultados obtidos
@@ -222,11 +301,11 @@ def print_max_sco_test(df, filter_max=True):
     print(df.head(15))
     
 
-def plot_scatter(normalized, res):
+def plot_scatter(normalized,test_size, res):
     res = read_resultado()
     for ativo in constants.STOCKS:
-        res_ativo = res.loc[(res["ATIVO"] == ativo) & (res["LOG"] == normalized) & (res["CM01"] == 0) ]
-        #res_ativo = res.loc[(res["ATIVO"] == ativo) & (res["LOG"] == normalized) ]
+        #res_ativo = res.loc[(res["ATIVO"] == ativo) & (res["LOG"] == normalized) & (res["CM01"] == 0) ]
+        res_ativo = res.loc[(res["ATIVO"] == ativo) & (res["LOG"] == normalized) ]
         # Plotting point using sactter method
         fig, ax = plt.subplots(4, 2, figsize=(10,14))
         plt.suptitle(ativo)
@@ -240,7 +319,7 @@ def plot_scatter(normalized, res):
         X = res_ativo["INST."]
         Y = res_ativo["N_RES"]
         ax[3, 1].scatter(X, Y);
-        ax[3, 1].title.set_text("TODOS ALGORITMOS")
+        ax[3, 1].title.set_text("TODOS ALGORITMOS - NORMALIZADO:"+str(normalized)+"TEST_SIZE"+str(test_size))
         plt.show()
 
 #Inicia o processo de apresentação de boxplot para o conjunto de dados exitente em res
@@ -249,20 +328,25 @@ def plot_scatter(normalized, res):
 # 2. N_RES x N_PER
 # 3. N_RES x TEST_SIZE
 #
-def plot_boxplots(res):
-    #res = res.loc[(res["N_PER"] == 1) & (res["TEST_SIZE"] == constants.DEFAULT_TEST_SIZE)]
-    res = res.loc[(res["TEST_SIZE"] == constants.DEFAULT_TEST_SIZE)]
-    normalized = True
+def plot_boxplots(res, normalized = True, test_size=constants.DEFAULT_TEST_SIZE):
+
+    if test_size != None:
+        res = res.loc[(res["TEST_SIZE"] == test_size)]
+    
     for ativo in constants.STOCKS:
         res_ = res.loc[(res["ATIVO"] == ativo)]
         plot_boxplot(ativo, res_, normalized, "ALG", constants.ALGORITMS)
         plot_boxplot(ativo, res_,normalized, "N_PER", range(1,len(constants.PERIODS_INDICATORS)+1))
         plot_boxplot(ativo, res_,normalized, "TEST_SIZE", constants.TRAIN_TEST_SPLIT_SIZES)
+        plot_boxplot(ativo, res_,normalized, "LOG", constants.NORMALIZE_OPTIONS)
     #res = res.loc[(res["TEST_SIZE"] == constants.DEFAULT_TEST_SIZE) & (res["ATIVO"] != "VALE3")]
     plot_boxplot("TODOS ATIVOS", res, normalized, "ALG", constants.ALGORITMS)
-    plot_boxplot("TODOS ATIVOS", res_,normalized, "N_PER", range(1,len(constants.PERIODS_INDICATORS)+1))
-    plot_boxplot("TODOS ATIVOS", res_,normalized, "TEST_SIZE", constants.TRAIN_TEST_SPLIT_SIZES)
+    plot_boxplot("TODOS ATIVOS", res,normalized, "N_PER", range(1,len(constants.PERIODS_INDICATORS)+1))
+    plot_boxplot("TODOS ATIVOS", res,normalized, "TEST_SIZE", constants.TRAIN_TEST_SPLIT_SIZES)
+    plot_boxplot("TODOS ATIVOS", res,normalized, "LOG", constants.NORMALIZE_OPTIONS)
 
+
+#função auxiliar para criar subplot
 def plot_subplot(ax, pos_1, pos_2, value_red, value_green, data, title):
     ax[pos_1, pos_2].boxplot(data);
     ax[pos_1, pos_2].set_xticklabels(constants.PERIODS_RESULTS)    
@@ -276,36 +360,50 @@ def plot_subplot(ax, pos_1, pos_2, value_red, value_green, data, title):
     
 #gera bloxplot de ativo por período de hold analisando o atributo informado em main_atrib
 def plot_boxplot(ativo, res, normalized, main_atrib, atribs):
-    res_ativo = res.loc[(res["LOG"] == normalized) ]
-    hold = res_ativo["VALID_BAL_HOLD"].iloc[0]
+    res_ativo = res
+    if normalized != None:
+        res_ativo = res.loc[(res["LOG"] == normalized) ]
+    
+    hold             = res_ativo["VALID_BAL_HOLD"].iloc[0]
+    if ativo == "TODOS ATIVOS":
+        hold = res_ativo["VALID_BAL_HOLD"].mean()
+    
+    count = res_ativo["VALID_BAL_HOLD"].count()
     qt_subplot_lines = int((len(atribs)+1)/2)
     fig, ax = plt.subplots(qt_subplot_lines, 2, figsize=(10,qt_subplot_lines*3))
-    plt.suptitle("RETORNO FINANCEIRO PERÍODO HOLD POR "+main_atrib+" - "+ativo)
+    plt.suptitle("RETORNO FINAN. (VALIDAÇÃO) NORM:"+str(normalized)+" PERÍODO HOLD POR "+main_atrib+" - "+ativo+"-QT:"+str(count))
+    
     data = pd.Series(dtype=int)
     for i in range(len(atribs)):
         res_alg = res_ativo.loc[(res_ativo[main_atrib] == atribs[i] )]
 
         for n in constants.PERIODS_RESULTS:
             data["N_RES"+str(n)] = res_alg.loc[(res_alg["N_RES"] == n)]["VALID_BAL_PRED"]
-            
+        
+        count2 = res_alg[main_atrib].count()
+        title = str(atribs[i]) +"/"+str(count2)
         plot_subplot(ax, int(i%qt_subplot_lines), int(i/qt_subplot_lines), 
-                     constants.DEFAULT_INIT_BALANCE, hold, data, atribs[i])
+                     constants.DEFAULT_INIT_BALANCE, hold, data, title)
 
     data = pd.Series(dtype=int)
     for n in constants.PERIODS_RESULTS:
         data["N_RES"+str(n)] = res_ativo.loc[(res_ativo["N_RES"] == n)]["VALID_BAL_PRED"]
     
-    plot_subplot(ax, qt_subplot_lines-1, 1, constants.DEFAULT_INIT_BALANCE, hold, data, "TODOS")
+    count2 = res_ativo[main_atrib].count()
+    title = "TODOS/"+str(count2)
+    plot_subplot(ax, qt_subplot_lines-1, 1, constants.DEFAULT_INIT_BALANCE, hold, data, title)
     plt.show()
         
 
+#faz plot do scatter do retorno financeiro por algoritmo e tempo de hold para cada ativo
+#UTILIZAR PREFERENCIALMENTE A FUNÇÃO PLOT_BOXPLOTS
 def plot_scatter_balance(res, normalized):
     for ativo in constants.STOCKS:
         res_ativo = res.loc[(res["ATIVO"] == ativo) & (res["LOG"] == normalized) ]
 
         hold = res_ativo["VALID_BAL_HOLD"].iloc[0]
         fig, ax = plt.subplots(4, 2, figsize=(10,14))
-        plt.suptitle(ativo)
+        plt.suptitle("RETORNO FINANCEIRO EM BASE DE VALIDAÇÃO POR N_RES E ALG - "+ativo)
         for i in range(len(constants.ALGORITMS)):
             X = res_ativo["N_RES"]
             Y = res_ativo["VALID_BAL_PRED"]
@@ -328,7 +426,7 @@ def plot_scatter_balance(res, normalized):
         ax[3, 1].add_line(line)
         ax[3, 1].add_line(lineg)
 
-        ax[3, 1].title.set_text("TODOS ALGORITMOS")
+        ax[3, 1].title.set_text("TODOS ALGORITMOS - NORMALIZADO:"+str(normalized))
         plt.show()
 
 
@@ -357,14 +455,10 @@ def sort_resultado_by_criteria(resultado, by_criteria, n_period_result=constants
 
     return df
 
-#.loc[(resultado["VP"] < 1) & (resultado["VN"] < 1)]
 #######################INICIO ANALISE DE RESULTADOS#####################
 def analyse_results():
 
     res = read_resultado()
-    #res = res.loc[(res["VP"] < 1) & (res["VN"] < 1)]
-    #res = res.loc[(res["LOG"] == constants.DEFAULT_NORMALIZED) & 
-    #              (res["TEST_SIZE"] == constants.DEFAULT_TEST_SIZE)]
     res = res.loc[(res["LOG"] == constants.DEFAULT_NORMALIZED) & 
               (res["TEST_SIZE"] == constants.DEFAULT_TEST_SIZE)]
     for ativo in constants.STOCKS:
@@ -377,13 +471,13 @@ def analyse_results():
     plot_global_result(res)
 
 def main():
+    print_res_alg()    
     compute_bets_results()
-    return
-    analyse_results()
-    plot_scatter(constants.DEFAULT_NORMALIZED, read_resultado())
-    plot_scatter_balance(read_resultado(), constants.DEFAULT_NORMALIZED)
-    plot_boxplots(read_resultado())    
-    
+    #analyse_results()#gera histograma de SCO_TEST
+    #plot_scatter(constants.DEFAULT_NORMALIZED, constants.DEFAULT_TEST_SIZE, read_resultado())
+    #plot_scatter_balance(read_resultado(), constants.DEFAULT_NORMALIZED)
+    #plot_boxplots(read_resultado(), normalized=None, test_size=None)    
+    #print_res_alg(True, 20)    
 print("The value of __name__ is:", repr(__name__))
 if __name__ == "__main__":
     main()    
