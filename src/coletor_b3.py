@@ -83,13 +83,12 @@ def calculate_indicators(df, applyNormalization):
 
     df["close-orig"] = df["close"]
     if applyNormalization:
-        print('>>>>>>>>>>>>>>>>>Normalizando os preços por LOGARITMO do ativo')
+        print('>>>>>>>>>Normalizando os preços por LOGARITMO do ativo')
         df["open"] = np.log(df["open"])
         df["high"] = np.log(df["high"])
         df["low"] = np.log(df["low"])
         df["close"] = np.log(df["close"])
-        
-    
+            
     for period in constants.PERIODS_INDICATORS:
         max_period = df['high'].rolling(period).max()
         min_period = df['low'].rolling(period).min()

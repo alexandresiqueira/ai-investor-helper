@@ -135,7 +135,6 @@ def __predict(ativo, dfStock, res_ativo_sorted, by_criteria, n_period_result, da
     dfPred = ai_trainner.adjust_technical_indicators(ativo, 
                                                      n_periods=res_ativo_sorted["N_PER"].iloc[0],  
                                                      normalize=res_ativo_sorted["LOG"].iloc[0], 
-                                                     half_sample=False, 
                                                      n_periods_result = res_ativo_sorted["N_RES"].iloc[0], 
                                                      cotacoes=dfPred)
     return __predict_for_validation(dfStock, dfPred, date_exec_init, 

@@ -84,14 +84,10 @@ def predic_best_models():
         #print(ativo,"-melhor:"+res_ativo_sorted["ALG"].iloc[1])
         cotacoes = ai_investor.read_file_stock(ativo,  n_periods=res_ativo_sorted["N_PER"].iloc[0],
                                        normalize=res_ativo_sorted["LOG"].iloc[0], 
-                                       half_sample= False,
                                        n_periods_result = res_ativo_sorted["N_RES"].iloc[0], 
                                        dt_init=constants.DATA_TRAIN_DATE_INIT, 
                                        dt_end=constants.DATA_TRAIN_DATE_END)
         
-        #print(">>>shape antes de validar:",cotacoes.shape)
-        #cotacoes = cotacoes.iloc[cotacoes.shape[0]-1:,0:(cotacoes.shape[1])]
-        #cotacoes = cotacoes.iloc[cotacoes.shape[0]-2:,0:(cotacoes.shape[1])]
         end_row = 150
         cotacoes = cotacoes.iloc[(cotacoes.shape[0])-end_row:, 0:(cotacoes.shape[1])]
         #cotacoes = cotacoes.loc[(cotacoes["res-positive-20"] == "False")]

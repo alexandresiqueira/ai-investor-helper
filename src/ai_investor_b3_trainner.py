@@ -87,15 +87,15 @@ def read_data_file_stock(ativo, normalized):
         cotacoes = pd.read_csv(constants.DATA_PATH+ativo+'-ind.csv',sep=constants.CSV_SEPARATOR) 
     return cotacoes    
 
-def read_file_stock_and_adjust(ativo, n_periods, normalize, half_sample, n_periods_result):
+def read_file_stock_and_adjust(ativo, n_periods, normalize, n_periods_result):
     cotacoes = read_data_file_stock(ativo, normalize)
 
-    cotacoes = adjust_technical_indicators(ativo, n_periods, normalize, half_sample, 
+    cotacoes = adjust_technical_indicators(ativo, n_periods, normalize, 
                                            n_periods_result, cotacoes)
     return cotacoes 
    
 #lê o arquivo e retira as colunas que não farão parte do índice
-def prepare_for_fit(cotacoes, ativo, n_periods, normalize, half_sample, n_periods_result, dt_init, dt_end):
+def prepare_for_fit(cotacoes, ativo, n_periods, normalize, n_periods_result, dt_init, dt_end):
     
     cotacoes = cotacoes.loc[(cotacoes["data"] > dt_init) & (cotacoes["data"] < dt_end)]
 
@@ -111,7 +111,8 @@ def prepare_for_fit(cotacoes, ativo, n_periods, normalize, half_sample, n_period
 # indicadores referentes a períodos maiores que n_periods os quais 
 # não serão utilizados e mantém apenas o atributo da classe a ser inferida de acordo 
 # com o período de retorno definido em n_periods_result
-def adjust_technical_indicators(ativo, n_periods, normalize, half_sample, n_periods_result, cotacoes):
+def adjust_technical_indicators(ativo, n_periods, normalize, n_periods_result, 
+                                cotacoes):
 
     count_periods = 0
     for period in constants.PERIODS_RESULTS:
@@ -155,10 +156,10 @@ def adjust_technical_indicators(ativo, n_periods, normalize, half_sample, n_peri
 
 def create_and_save_model(ativo, algoritmn, normalized, n_per, n_per_result, dt_init, dt_end, test_size):
     cotacoes = read_file_stock_and_adjust(ativo, n_periods = n_per, normalize=normalized, 
-                   half_sample=False, n_periods_result=n_per_result)
+                   n_periods_result=n_per_result)
     cotacoes = prepare_for_fit(cotacoes, ativo, n_periods = n_per, 
                                          normalize=normalized, 
-                   half_sample=False, n_periods_result=n_per_result, 
+                   n_periods_result=n_per_result, 
                    dt_init=dt_init, 
                    dt_end=dt_end)#ler todos registros
     
@@ -200,32 +201,15 @@ def fit_and_predict(X_train, X_test, y_train, y_test, clf, cotacoes, ativo,
                     test_size, resDf, cotacoesValidation, cotacoesValidClose):
     instances = cotacoes.shape[0]
 
+    #inicio do processo de treinamento e teste
     clf.fit(X_train, y_train)
     y_pred = clf.predict(X_test)
     y_pred_train = clf.predict(X_train)
     
-    balanceHold = cotacoesValidation["bal-hold"].iloc[cotacoesValidation.shape[0]-1]
-    le = LabelEncoder()
-    
-    y_valid = le.fit_transform(cotacoesValidation.iloc[:,(cotacoesValidation.shape[1] - 2)])
-    #print(X_validation.shape)
-    X_validation = cotacoesValidation.iloc[:,0:(cotacoesValidation.shape[1] - 2)]#remove bal-hol e res-positive
-    y_pred_validation = clf.predict(X_validation)
-    X_validation["close-orig"] = cotacoesValidClose #valores necessários para cálculo do retorno esperado financeiro
-
-    X_validation = ai_investor_validator.calc_return_predic(X_validation, y_pred_validation, 
-                                                  constants.DEFAULT_INIT_BALANCE, n_periods_result)
-
-    balanceValidPred = X_validation["bal-pred-"+str(n_periods_result)].iloc[X_validation.shape[0]-1]
-    acc_score_valid = accuracy_score(y_valid, y_pred_validation)
-
-    print(classification_report(y_test, y_pred, target_names=class_names))
     cnf_matrix      = confusion_matrix(y_test, y_pred)
     acc_score       = accuracy_score(y_test, y_pred)
     acc_score_train = accuracy_score(y_train, y_pred_train)
     num_atribs      = cotacoes.shape[1] - 1
-    print("Acurácia da base de treinamento: {:.2f}".format(acc_score_train))
-    print("Acurácia da base de teste: {:.2f}".format(acc_score))
     
     VP          = cnf_matrix[0,0] / (cnf_matrix[0,0] + cnf_matrix[0,1])
     VN          = cnf_matrix[1,1] / (cnf_matrix[1,1] + cnf_matrix[1,0])
@@ -238,7 +222,24 @@ def fit_and_predict(X_train, X_test, y_train, y_test, clf, cotacoes, ativo,
     
     support0    = (cnf_matrix[0,0] + cnf_matrix[0,1])
     support1    = (cnf_matrix[1,1] + cnf_matrix[1,0])
+
+
+    balanceHold = cotacoesValidation["bal-hold"].iloc[cotacoesValidation.shape[0]-1]
     
+    #executa a validação do modelo
+    le                  = LabelEncoder()    
+    y_valid             = le.fit_transform(cotacoesValidation.iloc[:,(cotacoesValidation.shape[1] - 2)])
+    X_validation        = cotacoesValidation.iloc[:,0:(cotacoesValidation.shape[1] - 2)]#remove bal-hol e res-positive
+    y_pred_validation   = clf.predict(X_validation)
+    X_validation["close-orig"] = cotacoesValidClose #valores necessários para cálculo do retorno esperado financeiro
+
+    X_validation        = ai_investor_validator.calc_return_predic(X_validation, 
+                                y_pred_validation, constants.DEFAULT_INIT_BALANCE, n_periods_result)
+
+    balanceValidPred = X_validation["bal-pred-"+str(n_periods_result)].iloc[X_validation.shape[0]-1]
+    acc_score_valid = accuracy_score(y_valid, y_pred_validation)
+
+    #grava os dados do resultado de treinamento, teste e validação
     resDf.loc[len(resDf.index)] = [clf_name, ativo, n_per_features, normalize, acc_score_train, 
                                    acc_score, num_atribs, instances, cnf_matrix[0,0], 
                                    cnf_matrix[0,1], cnf_matrix[1,0], cnf_matrix[1,1], 
@@ -247,7 +248,10 @@ def fit_and_predict(X_train, X_test, y_train, y_test, clf, cotacoes, ativo,
                                    recall0, recall1, f1_score0, f1_socre1,
                                    support0, support1, balanceHold, acc_score_valid, balanceValidPred]    
 
-    print(cnf_matrix)
+    #print(cnf_matrix)
+    #print(classification_report(y_test, y_pred, target_names=class_names))
+    #print("Acurácia da base de treinamento: {:.2f}".format(acc_score_train))
+    print("Acurácia da base de teste: {:.2f}".format(acc_score))
     
     return resDf
     
@@ -271,7 +275,7 @@ def process_ativo(cotacoes, ativo, n_per_features, normalize, n_per_result,
     for i in range (clfs.shape[0]):
         print("---------------------------------------")
         print(clfs["NAME_CLASSIFIER"].iloc[i])
-        print("---------------------------------------")
+        #print("---------------------------------------")
         
         resDf = fit_and_predict(X_train, X_test, y_train, y_test, clfs["CLASSIFIER"].iloc[i], 
                                 cotacoes, ativo, class_names, clfs["ID_CLASSIFIER"].iloc[i],
@@ -286,23 +290,22 @@ def exec_stock_train(ativo, normalize, n_per, n_per_result, test_size, resDf):
     
     #ler todos registros
     cotacoes = read_file_stock_and_adjust(ativo, n_periods = n_per+1, normalize=normalize, 
-                   half_sample=False, n_periods_result=n_per_result)#ler todos registros
+                   n_periods_result=n_per_result)#ler todos registros
     cotacoesValidation = cotacoes.loc[(cotacoes["data"] > constants.DATA_TRAIN_DATE_END)].copy()
     df = ai_investor_validator.calc_buy_and_hold(cotacoesValidation, constants.DEFAULT_INIT_BALANCE)
 
     cotacoesValidClose = cotacoesValidation["close-orig"]
     cotacoesValidation = prepare_for_fit(cotacoesValidation, ativo, n_periods = n_per+1, 
                                          normalize=normalize, 
-                   half_sample=False, n_periods_result=n_per_result, 
+                   n_periods_result=n_per_result, 
                    dt_init=constants.DATA_TRAIN_DATE_END, 
                    dt_end=99999999)#ler todos registros
     cotacoesForFit = prepare_for_fit(cotacoes, ativo, n_periods = n_per+1, normalize=normalize, 
-                   half_sample=False, n_periods_result=n_per_result, 
+                   n_periods_result=n_per_result, 
                    dt_init=constants.DATA_TRAIN_DATE_INIT, 
                    dt_end=constants.DATA_TRAIN_DATE_END)#ler todos registros
     resDf = process_ativo(cotacoesForFit, ativo, n_per+1,  normalize, n_per_result, 
                           test_size, resDf, cotacoesValidation, cotacoesValidClose)
-    #print(cotacoesValidation.tail(5))
     
 
 def train_test_ativo(ativo):
@@ -337,7 +340,6 @@ def main():
     print("###############################################################")
     stock = ""
     create_classifiers()
-    #train_test_ativo(stock)
     for i in range(1, len(sys.argv)):
         print('argument:', i, 'value:', sys.argv[i])
         stock = sys.argv[i]
