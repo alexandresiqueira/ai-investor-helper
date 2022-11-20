@@ -13,18 +13,18 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import constants
-"""
+
 np.set_printoptions(threshold=None, precision=2)
 pd.set_option('display.max_columns', 500)
 pd.set_option('display.max_rows', 500)
 pd.set_option('precision', 2)
-"""
+
 
 
 
 #ativo = "PETR4"
 
-cols = ["ativo", "per", "days", "count", "mean", "std", "min", "max"]
+cols = ["ativo", "per", "days", "count", "mean", "min", "max"]
 stat = pd.DataFrame(columns=cols)
 
 
@@ -61,7 +61,7 @@ def compute_stat(ativo, cotacoes):
         stat.loc[len(stat.index)] = [ativo, period,  tot_days, 
                                      dfAtivo1["res-perc-"+str(period)].count(), 
                                      dfAtivo1["res-perc-"+str(period)].mean(), 
-                                     dfAtivo1["res-perc-"+str(period)].std(), 
+                                     #dfAtivo1["res-perc-"+str(period)].std(), 
                                      dfAtivo1["res-perc-"+str(period)].min(), 
                                      dfAtivo1["res-perc-"+str(period)].max()]
 
@@ -152,20 +152,28 @@ def plot_ativo(cotacoes, ativo, normalize=False):
 #gera informaçoes estatísticas sobre o retorno financeiro dos ativos para as operações
 # de compra
 def print_stats_return(stat):
-    stat["count"] = stat["count"].astype(int)
+    stat["mean"] = stat["mean"].astype(float)
     print(stat)
     print(stat.describe())
-    
+    stat2 = stat.groupby(["per"]).agg({"mean": ['mean', 'min', 'max'], 
+                                       "days": ['mean', 'min', 'max'],
+                                       "count": ['mean', 'min', 'max']})
+    stat3 = stat.agg({"mean": ['mean', 'min', 'max'], 
+                                       "days": ['mean', 'min', 'max'],
+                                       "count": ['mean', 'min', 'max']})
+    """
     fig, ax = plt.subplots()
     #plt.figure(figsize=(16, 8))
     fig.patch.set_visible(False)
     ax.axis('off')
     #ax.set_title('Estatística de retorno dos ativos por período de hold')
-    stat.update(stat[['mean', 'std', 'min', 'max']].applymap('{:,.2f}'.format))
+    stat.update(stat[['mean', 'min', 'max']].applymap('{:,.2f}'.format))
     table = ax.table(stat.values, colLabels=stat.columns, loc='center', rowLabels=stat.index)
-    table.scale(1,2)
+    table.scale(1,1.8)
     plt.show()
-
+    """
+    print(stat2)
+    print(stat3)
     #print(stat.info())
     compute_stat_period(stat)
 
@@ -187,19 +195,20 @@ def plot_boxplot(stat):
                       constants.STOCKS[i])
     plt.show()
 
-
+is_plot = True
 def main():
-    
-    for ativo in constants.STOCKS:
-        cotacoes = read_ativo(ativo)
-        plot_ativo(cotacoes, ativo)
+    if is_plot:
+        for ativo in constants.STOCKS:
+            cotacoes = read_ativo(ativo)
+            plot_ativo(cotacoes, ativo)
     
     for ativo in constants.STOCKS:
         cotacoes = read_ativo(ativo)
         cotacoes = drop_columns(cotacoes)
-        plot_variables_scatter(ativo, cotacoes)
         compute_stat(ativo, cotacoes)
-        plot_cotacoes(ativo, cotacoes)
+        if is_plot:
+            plot_variables_scatter(ativo, cotacoes)
+            plot_cotacoes(ativo, cotacoes)
 
     print_stats_return(stat)
 

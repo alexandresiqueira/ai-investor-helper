@@ -3,8 +3,11 @@
 Created on Mon Oct 24 20:25:10 2022
 
 Script para identificar o melhor resultado por artivo e gravar um arquivo 
-/model/<ATIVO>-<PARAMETROS>.joblib
-para posterior execução
+/model/<ATIVO>-<PARAMETROS>.joblib para posterior execução
+
+A identificação do melhor modelo a ser salvo depende do arquivo -resultado.csv
+contendo todos resultados de treinamento e conjunto de informações para treinamento,
+como N_RES, N_PER, ALG, TEST_SIZE, LOG.
 
 @author: Alexandre Siqueira de Medeiros
 @contact: alexandre.siqueira@gmailcom
@@ -75,50 +78,6 @@ def get_best_model(ativo, by_criteria, n_period_result=constants.DEFAULT_PERIOD_
                               n_per_result = res_ativo_sorted["N_RES"].iloc[0])
     return clf
         # break
-def predic_best_models():
-    res = ra.read_resultado()
-    for ativo in constants.STOCKS:
-        res_ativo = res.loc[(res["ATIVO"] == ativo)]
-        res_ativo_sorted = ra.sort_resultado(res_ativo)
-        #print(res_ativo_sorted.head(1))
-        #print(ativo,"-melhor:"+res_ativo_sorted["ALG"].iloc[1])
-        cotacoes = ai_investor.read_file_stock(ativo,  n_periods=res_ativo_sorted["N_PER"].iloc[0],
-                                       normalize=res_ativo_sorted["LOG"].iloc[0], 
-                                       n_periods_result = res_ativo_sorted["N_RES"].iloc[0], 
-                                       dt_init=constants.DATA_TRAIN_DATE_INIT, 
-                                       dt_end=constants.DATA_TRAIN_DATE_END)
-        
-        end_row = 150
-        cotacoes = cotacoes.iloc[(cotacoes.shape[0])-end_row:, 0:(cotacoes.shape[1])]
-        #cotacoes = cotacoes.loc[(cotacoes["res-positive-20"] == "False")]
-        #print(cotacoes)
-        clf = get_best_model(ativo, algoritmn=res_ativo_sorted["ALG"].iloc[0], 
-                                  normalized=res_ativo_sorted["LOG"].iloc[0], 
-                                  n_per=res_ativo_sorted["N_PER"].iloc[0], 
-                                  n_per_result = res_ativo_sorted["N_RES"].iloc[0])
-        #X = cotacoes.iloc[cotacoes.shape[0]-1:,0:(cotacoes.shape[1]-1)]
-        #print(cotacoes.shape)
-        X = cotacoes.iloc[0:end_row-20,0:(cotacoes.shape[1]-1)]
-        #y_valid = cotacoes.iloc[0:50,(cotacoes.shape[1])]
-        y_valid = (cotacoes.iloc[:end_row-20,(cotacoes.shape[1] - 1)])
-        y = clf.predict(X)
-        print(">>>>>>>>>>>PREDICT-Y-",ativo,":")
-        print(y)
-        print(">>>>>>>>>>>PREDICT-Y-valid",ativo,":")
-        print(y_valid.iloc[0])
-        y_valid = y_valid == "True" 
-        y_valid = y_valid.astype(int) 
-        y_valid = y_valid.to_numpy()
-        print(type(y))
-        print(type(y_valid))
-        print(y_valid)
-        print(">>>>>>>>>>>>>>>>>>>", ativo)
-        print((y_valid) -( y))
-        qt = ((y_valid) -( y)) != 0
-        total_acerto = qt.astype(int).sum()
-        print("Resultado - ", ativo, ":",total_acerto, "; de total testes:",qt.size, ";precent:",(total_acerto/qt.size))
-
-        #break
 
 def save_models():
     for criteria in constants.BY_CRITERIA_RANK:

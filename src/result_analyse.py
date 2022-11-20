@@ -148,15 +148,18 @@ def plot_resultado(resultados, period, ativo=""):
 
 
 #Faz o plt de um ativo em um grafico contendo data, preço de fechamento m média exponencial e bandas de bolinger
-def plot_ativo(resultado, ativo, period=constants.DEFAULT_PERIOD_RES):
+def plot_ativo(resultado, ativo, normalized=constants.DEFAULT_NORMALIZED, test_size=constants.DEFAULT_TEST_SIZE, 
+               period=constants.DEFAULT_PERIOD_RES):
     df = pd.Series(dtype=object)
 
     df = resultado    
     if ativo != "TOTAL":
         df = resultado.loc[(resultado["ATIVO"] == ativo) ]    
+    
+    df = df.loc[(resultado["LOG"] == normalized) & (resultado["TEST_SIZE"] == test_size) ]    
 
-    fig, ax = plt.subplots(5, 2, figsize=(14,14))
-    plt.suptitle("Acurácia dos algoritmos versus quantidade de atributos, para n períodos - "+ativo)
+    fig, ax = plt.subplots(5, 2, figsize=(10,14))
+    plt.suptitle("Acurácia dos algoritmos versus quantidade de atributos, para n períodos \n "+ativo+" - NORMALIZED:"+str(normalized)+"  - TEST SIZE:"+str(test_size))
     
     i = 0
     for i in range(7):
@@ -216,18 +219,18 @@ def plot_ativo(resultado, ativo, period=constants.DEFAULT_PERIOD_RES):
 
 """
 """
-def plot_global_result(resultado):
+def plot_global_result(resultado, atrib_res):
 
-    fig, ax = plt.subplots(3, 1, figsize=(10,10))
-    plt.suptitle("Acurácia global dos algoritmos versus quantidade de atributos, para n períodos")
+    fig, ax = plt.subplots(3, 1, figsize=(6,10))
+    plt.suptitle("Acurácia versus quantidade de atributos, para n períodos\n"+ atrib_res)
 
     ########INICIO PLOT DAS ESTATÍSTICAS TOTAIS############
     df = resultado
     dfx = resultado
-    dfx= dfx.groupby(["ATRIBS"]).agg({'SCO_TEST': ['mean', 'min', 'max']})
-    ax[0].plot(dfx["SCO_TEST"].index, dfx["SCO_TEST"]["max"], label="Máxima");
-    ax[0].plot(dfx["SCO_TEST"].index, dfx["SCO_TEST"]["mean"], label="Média");
-    ax[0].plot(dfx["SCO_TEST"].index, dfx["SCO_TEST"]["min"], label="Mínima");
+    dfx= dfx.groupby(["ATRIBS"]).agg({atrib_res: ['mean', 'min', 'max']})
+    ax[0].plot(dfx[atrib_res].index, dfx[atrib_res]["max"], label="Máxima");
+    ax[0].plot(dfx[atrib_res].index, dfx[atrib_res]["mean"], label="Média");
+    ax[0].plot(dfx[atrib_res].index, dfx[atrib_res]["min"], label="Mínima");
     ax[0].legend()
     ax[0].title.set_text("Acurácia Total versus Quantidade de atributos")
     ax[0].grid(True)
@@ -239,8 +242,8 @@ def plot_global_result(resultado):
     for alg in constants.ALGORITMS:
         df1 = df
         df1 = df1.loc[(df1["ALG"] == alg)]
-        dfx= df1.groupby(["ATRIBS"]).agg({'SCO_TEST': ['mean', 'min', 'max']})
-        ax[1].plot(dfx["SCO_TEST"].index, dfx["SCO_TEST"]["mean"], label=alg);
+        dfx= df1.groupby(["ATRIBS"]).agg({atrib_res: ['mean', 'min', 'max']})
+        ax[1].plot(dfx[atrib_res].index, dfx[atrib_res]["mean"], label=alg);
         ax[1].legend()
         dfx["ALG"] = alg
         if df_alg.size == 0:
@@ -248,8 +251,8 @@ def plot_global_result(resultado):
         else:
             df_alg = df_alg.append(dfx)
     
-    print("\n#####ACURACIA MÉDIA MÁXIMA POR PÉRIODO E ALGORITMOS - GLOBAL####")
-    print_max_sco_test(df_alg)
+    print("\n#####",atrib_res,":ACURACIA MÉDIA MÁXIMA \nPOR PERÍODOS E ALGORITMOS ####")
+    print_max_sco_test(df_alg, True, atrib_res)
 
     ax[1].title.set_text("Acurácia Média - Atributos versus Algoritmo ")
     ax[1].grid(True)
@@ -260,48 +263,55 @@ def plot_global_result(resultado):
     for per in constants.PERIODS_RESULTS:
         df1 = df
         df1 = df1.loc[(df1["N_RES"] == per)]
-        dfx= df1.groupby(["ATRIBS"]).agg({'SCO_TEST': ['mean', 'min', 'max']})
+        dfx= df1.groupby(["ATRIBS"]).agg({atrib_res: ['mean', 'min', 'max']})
         dfx["N_RES"] = per
         if df_time_hold.size == 0:
             df_time_hold = dfx
         else:
             df_time_hold = df_time_hold.append(dfx)
-        ax[2].plot(dfx["SCO_TEST"].index, dfx["SCO_TEST"]["mean"], label="TH-"+str(per));
+        ax[2].plot(dfx[atrib_res].index, dfx[atrib_res]["mean"], label="TH-"+str(per));
         ax[2].legend()
         
     ax[2].title.set_text("Acurácia Média - Atributos versus Tempo de Hold")
     ax[2].grid(True)
 
-    print("\n#####ACURACIA MÉDIA MÁXIMA POR PÉRIODO E ATRIBUTOS - GLOBAL####")
-    print_max_sco_test(df_time_hold)
+    print("\n#####",atrib_res,":ACURACIA MÉDIA MÁXIMA \nPOR PERÍODOS E TEMPO OPERAÇÃO (N_RES) ####")
+    print_max_sco_test(df_time_hold, True, atrib_res)
 
-    print("\n#####ACURACIA PARA RESULTADO EM ",constants.DEFAULT_PERIOD_RES," PÉRIODOS E ATRIBUTOS - GLOBAL####")
+    print("\n#####ACURACIA PARA RESULTADO EM ",constants.DEFAULT_PERIOD_RES," PERÍODOS E ATRIBUTOS - GLOBAL####")
     df1 = df
     max_df = df1["ATRIBS"].max()
     df1 = df1.loc[(df1["N_RES"] == constants.DEFAULT_PERIOD_RES) & (df1["ATRIBS"] == max_df)]
     #print(df1)
-    df1= df1.groupby(["N_RES", "ALG"]).agg({'SCO_TEST': ['mean', 'min', 'max']})
-    print_max_sco_test(df1, False)
+    df1= df1.groupby(["N_RES", "ALG"]).agg({atrib_res: ['mean', 'min', 'max']})
+    print_max_sco_test(df1, False, atrib_res)
 
     plt.legend()
     plt.show()
 
-def print_max_sco_test(df, filter_max=True):  
+def print_max_sco_test(df, filter_max=True, atrib_res="SCO_TEST"):  
     max_df = df.index.max()
     if filter_max:
         df = df.loc[(df.index == max_df)].copy()
-    #print(df)
-    df["MEAN"] = df["SCO_TEST"]["mean"]
-    df["MAX"] = df["SCO_TEST"]["max"]
-    df["MIN"] = df["SCO_TEST"]["min"]
+    if len(df.columns) == 4:
+        df.columns = ["MEAN", "MIN","MAX", df.columns[3][0]]
+    else:
+        df.columns = ["MEAN", "MIN","MAX"]
+        
+    df = df.reset_index()
+    """
+    df["MEAN"] = df[atrib_res]["mean"]
+    df["MAX"] = df[atrib_res]["max"]
+    df["MIN"] = df[atrib_res]["min"]
     #df.drop(2, axis=1)
-    df = df.drop(["SCO_TEST"], axis=1)
+    df = df.drop([atrib_res], axis=1)
+    """
     df = df.sort_values(by='MEAN', axis=0, ascending=False, inplace=False,  
                           kind='quicksort', na_position='last')    
     print(df.head(15))
     
-
-def plot_scatter(normalized,test_size, res):
+#deprecated: plota scatter registros por resultado
+def __plot_scatter(normalized,test_size, res):
     res = read_resultado()
     for ativo in constants.STOCKS:
         #res_ativo = res.loc[(res["ATIVO"] == ativo) & (res["LOG"] == normalized) & (res["CM01"] == 0) ]
@@ -431,16 +441,7 @@ def plot_scatter_balance(res, normalized):
 
 
 
-def sort_resultado_from_period(resultado, n_period_result=constants.DEFAULT_PERIOD_RES):
-    df = resultado.loc[(resultado["N_RES"] == n_period_result)]    
-    df = df.drop(["CM00","CM10","CM01","CM11", "SCO_TRAIN"], axis=1)
-    #df = df.drop([1], axis=1)
-    df = df.sort_values(by='SCO_TEST', axis=0, ascending=False, inplace=False, 
-                          kind='quicksort', na_position='last')    
-    #print(df.head(10))
-    return df
-
-
+#Ordena os resultados de processamento pelo campo especificado em by_criteria
 def sort_resultado_by_criteria(resultado, by_criteria, n_period_result=constants.DEFAULT_PERIOD_RES):
     if n_period_result != None:
         df = resultado.loc[(resultado["N_RES"] == n_period_result)]   
@@ -456,28 +457,32 @@ def sort_resultado_by_criteria(resultado, by_criteria, n_period_result=constants
     return df
 
 #######################INICIO ANALISE DE RESULTADOS#####################
+#Plota gráfico em linha da acurácia obtida na base de teste
 def analyse_results():
 
     res = read_resultado()
-    res = res.loc[(res["LOG"] == constants.DEFAULT_NORMALIZED) & 
-              (res["TEST_SIZE"] == constants.DEFAULT_TEST_SIZE)]
+    #res = res.loc[(res["LOG"] == constants.DEFAULT_NORMALIZED) & 
+     #         (res["TEST_SIZE"] == constants.DEFAULT_TEST_SIZE)]
     for ativo in constants.STOCKS:
         res_ativo = res.loc[(res["ATIVO"] == ativo)]# & (res["LOG"] == constants.DEFAULT_NORMALIZED)]
         #res_ativo = sort_resultado(res_ativo)
 
         plot_resultado(res_ativo, period=constants.DEFAULT_PERIOD_RES, ativo=ativo)
-        plot_ativo(res_ativo, ativo)
-        
-    plot_global_result(res)
+        for t in constants.TRAIN_TEST_SPLIT_SIZES:
+            plot_ativo(res_ativo, ativo, True, t)
+            plot_ativo(res_ativo, ativo, False, t)
+        break
+    plot_global_result(res, "SCO_TEST")
+    plot_global_result(res, "SCO_VALID")
 
 def main():
     print_res_alg()    
-    compute_bets_results()
-    #analyse_results()#gera histograma de SCO_TEST
+    #compute_bets_results()
+    analyse_results()#gera histograma de SCO_TEST
     #plot_scatter(constants.DEFAULT_NORMALIZED, constants.DEFAULT_TEST_SIZE, read_resultado())
     #plot_scatter_balance(read_resultado(), constants.DEFAULT_NORMALIZED)
-    #plot_boxplots(read_resultado(), normalized=None, test_size=None)    
-    #print_res_alg(True, 20)    
+    plot_boxplots(read_resultado(), normalized=None, test_size=None)    
+
 print("The value of __name__ is:", repr(__name__))
 if __name__ == "__main__":
     main()    

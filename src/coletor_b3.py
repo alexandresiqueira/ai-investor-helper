@@ -88,19 +88,6 @@ def calculate_indicators(df, applyNormalization):
         df["high"] = np.log(df["high"])
         df["low"] = np.log(df["low"])
         df["close"] = np.log(df["close"])
-            
-    for period in constants.PERIODS_INDICATORS:
-        max_period = df['high'].rolling(period).max()
-        min_period = df['low'].rolling(period).min()
-        df["max-"+str(period)] = max_period
-        df["min-"+str(period)] = min_period
-        df["fibo-ret-"+str(period)] = ((df["close"] - min_period)/ 
-                                       (max_period - min_period) ) * 100
-        
-    for period in constants.PERIODS_INDICATORS:
-        trend_ma = ta.trend.SMAIndicator(close=df["close"], window=period)
-        df["SMA-"+str(period)] = trend_ma.sma_indicator()
-        df["SMA-dist-"+str(period)] = df["SMA-"+str(period)] - df["close"]
 
     for period in constants.PERIODS_INDICATORS:
         trend_ema = ta.trend.EMAIndicator(close=df["close"], window=period)
@@ -135,6 +122,19 @@ def calculate_indicators(df, applyNormalization):
         df.loc[:,"BBHI-"+str(period)] = bb.bollinger_hband_indicator()
         df.loc[:,"BBL-"+str(period)] = bb.bollinger_lband()
         df.loc[:,"BBLI-"+str(period)] = bb.bollinger_lband_indicator()
+            
+    for period in constants.PERIODS_INDICATORS:
+        max_period = df['high'].rolling(period).max()
+        min_period = df['low'].rolling(period).min()
+        df["max-"+str(period)] = max_period
+        df["min-"+str(period)] = min_period
+        df["fibo-ret-"+str(period)] = ((df["close"] - min_period)/ 
+                                       (max_period - min_period) ) * 100
+        
+    for period in constants.PERIODS_INDICATORS:
+        trend_ma = ta.trend.SMAIndicator(close=df["close"], window=period)
+        df["SMA-"+str(period)] = trend_ma.sma_indicator()
+        df["SMA-dist-"+str(period)] = df["SMA-"+str(period)] - df["close"]
 
     for period in constants.PERIODS_RESULTS:
         diff = df['close-orig'].rolling(period).apply(my_rolling_dif)
