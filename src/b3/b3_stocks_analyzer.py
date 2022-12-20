@@ -10,6 +10,9 @@ negociado em todo período analisado.
 """
 import coletor_b3
 import pandas as pd
+import os,sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import constants
 
 
@@ -32,7 +35,7 @@ def extract_top_b3_stocks(n_stocks):
     dfGlobal = pd.Series(dtype=float)
     for year in range (constants.DATA_YEAR_INIT, constants.DATA_YEAR_END):
     #for year in range (2021, constants.DATA_YEAR_END):
-        dfYear = coletor_b3.read_data('COTAHIST_A'+str(year)+'.ZIP')
+        dfYear = coletor_b3.read_data('COTAHIST_A'+str(year)+'.ZIP', constants.PATH_B3_SERIES_LOCAL)
         dfYear = extract_stocks(dfYear)
         #print(dfYear.describe())
         if dfGlobal.size == 0:

@@ -49,6 +49,11 @@ from joblib import dump, load
 import os.path
 import constants
 import ai_investor_validator
+import decision_tree_viz
+
+import os
+os.environ["PATH"] += os.pathsep + 'C:/Program Files/Graphviz/bin/'
+
 
 clfs = pd.DataFrame([], columns = ["CLASSIFIER", "ID_CLASSIFIER", "NAME_CLASSIFIER"])
 
@@ -56,7 +61,7 @@ clfs = pd.DataFrame([], columns = ["CLASSIFIER", "ID_CLASSIFIER", "NAME_CLASSIFI
 res_cols_names = ["ALG", "ATIVO", "N_PER", "LOG", "SCO_TRAIN", "SCO_TEST", "ATRIBS",
                   "INST.", "CM00", "CM01", "CM10", "CM11", "VP", "VN", "N_RES", "TEST_SIZE",
                   "PRECISION0", "PRECISION1", "RECALL0",  "RECALL0", "F1-SCORE0",
-                  "F1-SCORE1", "SUPPORT0", "SUPPORT1", "VALID_BAL_HOLD", 
+                  "F1-SCORE1", "SUPPORT0", "SUPPORT1", "SUP0_V",  "SUP1_V", "VALID_BAL_HOLD", 
                   "SCO_VALID", "VALID_BAL_PRED"]
 pd.set_option('display.float_format','{:.2f}'.format)
 np.set_printoptions(precision=2)
@@ -70,21 +75,28 @@ def create_classifiers():
     rdc     = RandomForestClassifier()
     gnb     = GaussianNB()
     svmc    = svm.SVC(C=1)
-    
-    clfs.loc[len(clfs.index)] = [svmc, "SVM", "Support Vector Machine"]
-    clfs.loc[len(clfs.index)] = [neigh, "KNN", "K Nearest Neighbors "]
-    clfs.loc[len(clfs.index)] = [lreg, "LREG", "Regressão logística"]
-    clfs.loc[len(clfs.index)] = [dtc3, "DTC3", "Arvore de Decisão - 3"]
-    clfs.loc[len(clfs.index)] = [dtc6, "DTC6", "Arvore de Decisão - 6"]
-    clfs.loc[len(clfs.index)] = [rdc, "RFC", "Arvore de Decisão - Random Forest"]
-    clfs.loc[len(clfs.index)] = [gnb, "GNB", "Gaussian Naive Bayes"]
+    for algo in constants.ALGORITMS:
+        if algo == "SVM":
+            clfs.loc[len(clfs.index)] = [svmc, "SVM", "Support Vector Machine"]
+        elif algo == "KNN":
+            clfs.loc[len(clfs.index)] = [neigh, "KNN", "K Nearest Neighbors "]
+        elif algo == "LREG":
+            clfs.loc[len(clfs.index)] = [lreg, "LREG", "Regressão logística"]
+        elif algo == "DTC3":
+            clfs.loc[len(clfs.index)] = [dtc3, "DTC3", "Arvore de Decisão - 3"]
+        elif algo == "DTC6":
+            clfs.loc[len(clfs.index)] = [dtc6, "DTC6", "Arvore de Decisão - 6"]
+        elif algo == "RFC":
+            clfs.loc[len(clfs.index)] = [rdc, "RFC", "Arvore de Decisão - Random Forest"]
+        elif algo == "GNB":
+            clfs.loc[len(clfs.index)] = [gnb, "GNB", "Gaussian Naive Bayes"]
     
     
 def read_data_file_stock(ativo, normalized):
     if normalized:
-        cotacoes = pd.read_csv(constants.DATA_PATH+ativo+'-log-ind.csv',sep=constants.CSV_SEPARATOR) 
+        cotacoes = pd.read_csv(constants.DATA_PATH_STOCKS+ativo+'-log-ind.csv',sep=constants.CSV_SEPARATOR) 
     else:
-        cotacoes = pd.read_csv(constants.DATA_PATH+ativo+'-ind.csv',sep=constants.CSV_SEPARATOR) 
+        cotacoes = pd.read_csv(constants.DATA_PATH_STOCKS+ativo+'-ind.csv',sep=constants.CSV_SEPARATOR) 
     return cotacoes    
 
 def read_file_stock_and_adjust(ativo, n_periods, normalize, n_periods_result):
@@ -137,6 +149,8 @@ def adjust_technical_indicators(ativo, n_periods, normalize, n_periods_result,
             cotacoes = cotacoes.drop("BBHI-"+str(period), axis=1)
             cotacoes = cotacoes.drop("BBL-"+str(period), axis=1)
             cotacoes = cotacoes.drop("BBLI-"+str(period), axis=1)
+            cotacoes = cotacoes.drop("BBP-"+str(period), axis=1)
+            cotacoes = cotacoes.drop("FI-"+str(period), axis=1)
             cotacoes = cotacoes.drop("EMA-"+str(period), axis=1)
             cotacoes = cotacoes.drop("EMA-dist-"+str(period), axis=1)
             
@@ -149,7 +163,7 @@ def adjust_technical_indicators(ativo, n_periods, normalize, n_periods_result,
     
     cotacoes["res-positive-"+str(n_periods_result)] = cotacoes["res-positive-"+str(n_periods_result)].astype(str)
     
-    cotacoes.to_csv(constants.DATA_PATH+ativo+str(normalize)+"-train.csv", sep=constants.CSV_SEPARATOR, encoding='utf-8', index=False)
+    cotacoes.to_csv(constants.DATA_PATH_STOCKS+ativo+str(normalize)+"-train.csv", sep=constants.CSV_SEPARATOR, encoding='utf-8', index=False)
 
     return cotacoes
 
@@ -187,12 +201,13 @@ def save_model(clf, ativo, algoritmn, normalized, n_per, n_per_result):
 
 def load_model(ativo, algoritmn, normalized, n_per, n_per_result):
     file_name = get_job_file_name(ativo, algoritmn, normalized, n_per, n_per_result) 
-    print("LOADING MODEL FILE:", file_name)
+    #print("LOADING MODEL FILE:", file_name)
     if os.path.isfile(file_name):
         clf = load(file_name)
+        return clf
     else:
         print("ALERT - MODEL:", algoritmn, " FOR STOCK:", ativo, " AND PERIOD:", n_per_result, " DOESN'T EXISTS")
-    return clf
+    return None
 
 #Funcao responsavel por realizar o treinamento, teste e validação de um classificador especifico (clf)
 #o resultado da classificacao eh armazenado na varíavel global resDf com as informações conforme res_cols_names
@@ -237,7 +252,13 @@ def fit_and_predict(X_train, X_test, y_train, y_test, clf, cotacoes, ativo,
                                 y_pred_validation, constants.DEFAULT_INIT_BALANCE, n_periods_result)
 
     balanceValidPred = X_validation["bal-pred-"+str(n_periods_result)].iloc[X_validation.shape[0]-1]
-    acc_score_valid = accuracy_score(y_valid, y_pred_validation)
+    acc_score_valid  = accuracy_score(y_valid, y_pred_validation)
+    
+    cnf_matrix_valid = confusion_matrix(y_valid, y_pred_validation)
+    support0_valid   = (cnf_matrix_valid[0,0] + cnf_matrix_valid[0,1])
+    support1_valid    = (cnf_matrix_valid[1,1] + cnf_matrix_valid[1,0])
+    #print("support0:",support0,";support1:",support1)
+    #print("support0_valid:",support0_valid,";support1_valid:",support1_valid)
 
     #grava os dados do resultado de treinamento, teste e validação
     resDf.loc[len(resDf.index)] = [clf_name, ativo, n_per_features, normalize, acc_score_train, 
@@ -246,12 +267,14 @@ def fit_and_predict(X_train, X_test, y_train, y_test, clf, cotacoes, ativo,
                                    VP, VN, n_periods_result, test_size, 
                                    precision0, precision1, 
                                    recall0, recall1, f1_score0, f1_socre1,
-                                   support0, support1, balanceHold, acc_score_valid, balanceValidPred]    
+                                   support0, support1, support0_valid, support1_valid, 
+                                   balanceHold, acc_score_valid, balanceValidPred]    
 
     #print(cnf_matrix)
     #print(classification_report(y_test, y_pred, target_names=class_names))
     #print("Acurácia da base de treinamento: {:.2f}".format(acc_score_train))
     print("Acurácia da base de teste: {:.2f}".format(acc_score))
+    print("Acurácia da base de validacao: {:.2f}".format(acc_score_valid))
     
     return resDf
     
@@ -268,20 +291,32 @@ def process_ativo(cotacoes, ativo, n_per_features, normalize, n_per_result,
     #ultima coluna contem resultados
     le = LabelEncoder()
     y = le.fit_transform(cotacoes.iloc[:,(cotacoes.shape[1] - 1)])
+    #y = cotacoes.iloc[:,(cotacoes.shape[1] - 1)]
     class_names = le.classes_
     
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=0)
     
+    columns_names = cotacoes.columns[:len(cotacoes.columns) - 1]
+    #print(columns_names)
+    #print(class_names)
     for i in range (clfs.shape[0]):
         print("---------------------------------------")
         print(clfs["NAME_CLASSIFIER"].iloc[i])
+        id_clf = clfs["ID_CLASSIFIER"].iloc[i]
         #print("---------------------------------------")
-        
         resDf = fit_and_predict(X_train, X_test, y_train, y_test, clfs["CLASSIFIER"].iloc[i], 
-                                cotacoes, ativo, class_names, clfs["ID_CLASSIFIER"].iloc[i],
+                                cotacoes, ativo, class_names, id_clf,
                                 n_per_features, normalize, n_per_result, test_size, 
                                 resDf, cotacoesValidation, cotacoesValidClose)
-    
+
+        if constants.GENERATE_TREE_GRAPH:
+            decision_tree_viz.dtree_visualize(clfs["CLASSIFIER"].iloc[i],
+                      X_train,
+                      y_train,
+                      target_name='res-positive-'+str(n_per_result),
+                      feature_names=columns_names,
+                      class_names=list(class_names),
+                      title=ativo+" - "+str(id_clf)+" n_res="+str(n_per_result))
     return resDf
 
 def exec_stock_train(ativo, normalize, n_per, n_per_result, test_size, resDf):
@@ -317,10 +352,11 @@ def train_test_ativo(ativo):
         for n_per_result in constants.PERIODS_RESULTS:
             for test_size in constants.TRAIN_TEST_SPLIT_SIZES:
                 
-                exec_stock_train(ativo, True, n_per, n_per_result, test_size, resDf)
-                exec_stock_train(ativo, False, n_per, n_per_result, test_size, resDf)
+                for norm in constants.NORMALIZE_OPTIONS:
+                    exec_stock_train(ativo, norm, n_per, n_per_result, test_size, resDf)
+                #exec_stock_train(ativo, False, n_per, n_per_result, test_size, resDf)
 
-                resDf.to_csv(constants.DATA_PATH+ativo+constants.FILE_NAME_RESULTADO, 
+                resDf.to_csv(constants.DATA_PATH_RESULTS+ativo+constants.FILE_NAME_RESULTADO, 
                              sep=constants.CSV_SEPARATOR, encoding='utf-8', index=True)
         
     
@@ -338,6 +374,8 @@ def main():
     print("###############################################################")
     print("############################ B3 TRAIN #########################")
     print("###############################################################")
+    if not os.path.exists(constants.DATA_PATH_RESULTS):
+        os.mkdir(constants.DATA_PATH_RESULTS)
     stock = ""
     create_classifiers()
     for i in range(1, len(sys.argv)):

@@ -18,7 +18,7 @@ import constants
 def group_res_files():
     dfGlobal = pd.Series(dtype=float)
     for ativo in constants.STOCKS:
-        fname = constants.DATA_PATH+ativo+constants.FILE_NAME_RESULTADO
+        fname = constants.DATA_PATH_RESULTS+ativo+constants.FILE_NAME_RESULTADO
         print("Processando Ativo:", ativo, ". Arquivo:",fname)
         if os.path.isfile(fname):    
             df = pd.read_csv(fname, sep=constants.CSV_SEPARATOR, index_col=0)
@@ -31,7 +31,7 @@ def group_res_files():
             
     print("Criando arquivo consolidado:", constants.DATA_PATH+constants.FILE_NAME_RESULTADO)
 
-    dfGlobal.to_csv(constants.DATA_PATH+constants.FILE_NAME_RESULTADO, sep=constants.CSV_SEPARATOR, 
+    dfGlobal.to_csv(constants.DATA_PATH_RESULTS+constants.FILE_NAME_RESULTADO, sep=constants.CSV_SEPARATOR, 
                     encoding='utf-8', index=True)
 
 

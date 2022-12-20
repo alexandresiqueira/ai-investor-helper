@@ -23,19 +23,19 @@ import constants
 
 
 #funcao responsavel por ler o arquivo e extrair os dados
-def read_data(file):
+def read_data(file, path=constants.DATA_PATH_STOCKS):
     colspecs = [(0, 2), (2, 10), (12, 24), (24, 27), (56, 69), (69, 82),
                 (82, 95), (108, 121) , (170, 188)]#posicao dos atributos desejados
     colsnames = ['tp-reg','data', 'ativo', 'tp-merc', 'open', 'high', 'low', 
                  'close', 'volume']      
     try:
         print("Carregando arquivo B3:", file)
-        df = pd.read_fwf(constants.DATA_PATH+file, skiprows=0, skipfooter=0, colspecs=colspecs, 
+        df = pd.read_fwf(path+file, skiprows=1, skipfooter=1, colspecs=colspecs, 
                     names=colsnames, compression='zip')
         
     except UnicodeDecodeError:
         print("Carregando arquivo B3 - ISO-8859-1:", file)
-        df = pd.read_fwf(constants.DATA_PATH+file, skiprows=0, skipfooter=0, colspecs=colspecs, 
+        df = pd.read_fwf(path+file, skiprows=1, skipfooter=1, colspecs=colspecs, 
                     names=colsnames, compression='zip', encoding="ISO-8859-1")
         
     return df
@@ -64,6 +64,7 @@ def my_rolling_dif(x):
 # - Bandas de Bollinger de Alta Indicador - BBHI
 # - Bandas de Bollinger de Baixa - BBL
 # - Bandas de Bollinger de Baixa Indicador - BBLI
+# - Bandas de Bollinger Percentual - BBP
 # - Índice de Força Relativa - RSI
 # - Indicador de Força Verdadeira - TSI
 # - Oscilador Estocástico - SO
@@ -71,6 +72,7 @@ def my_rolling_dif(x):
 # - MACD - MACD
 # - Diferença MACD - MACD-DIFF
 # - Sinal MACD - MACD-SIGNAL
+# - ForceIndexIndicator - FI
 # Cada um dos indicadores é calculado nos diversos períodos definidos no
 #   vetor _periods, por exemplo, SMA-7, SMA-14, SMA-20, BBH-7, BBH-14,etc. 
 # Além dos indicadores, são geradas informações de resultado entre o fechamento 
@@ -83,7 +85,7 @@ def calculate_indicators(df, applyNormalization):
 
     df["close-orig"] = df["close"]
     if applyNormalization:
-        print('>>>>>>>>>Normalizando os preços por LOGARITMO do ativo')
+        #print('>>>>>>>>>Normalizando os preços por LOGARITMO do ativo')
         df["open"] = np.log(df["open"])
         df["high"] = np.log(df["high"])
         df["low"] = np.log(df["low"])
@@ -122,7 +124,17 @@ def calculate_indicators(df, applyNormalization):
         df.loc[:,"BBHI-"+str(period)] = bb.bollinger_hband_indicator()
         df.loc[:,"BBL-"+str(period)] = bb.bollinger_lband()
         df.loc[:,"BBLI-"+str(period)] = bb.bollinger_lband_indicator()
+        df.loc[:,"BBP-"+str(period)] = bb.bollinger_pband() #percentual da banda 
             
+    for period in constants.PERIODS_INDICATORS:
+        fi = ta.volume.ForceIndexIndicator(close=df["close"], volume=df["volume"], window=period)
+        df.loc[:,"FI-"+str(period)] = fi.force_index()
+    """
+    for period in constants.PERIODS_INDICATORS:
+        obv = ta.volume.OnBalanceVolumeIndicator(close=df["close"], volume=df["volume"])
+        df.loc[:,"OBV-"+str(period)] = obv.on_balance_volume()
+
+    """
     for period in constants.PERIODS_INDICATORS:
         max_period = df['high'].rolling(period).max()
         min_period = df['low'].rolling(period).min()
@@ -141,32 +153,34 @@ def calculate_indicators(df, applyNormalization):
         df.loc[:,"res-"+str(period)] = diff.shift(-1*period + 1)
         df.loc[:,"res-positive-"+str(period)] = (diff.shift(-1*period + 1) > 0).astype(str)
         df.loc[:,"res-perc-"+str(period)] = (df["res-"+str(period)]/df['close-orig'])*100
-
+        
     return df
 
 def read_sotck_file(fname):
     df = pd.read_csv(fname, sep=';')  
     return df
 
-def read_stock_indicator_file(ativo):
-    df = pd.read_csv(constants.DATA_PATH+ativo+".csv", sep=constants.CSV_SEPARATOR)  
+def read_stock_indicator_file(ativo, path_stocks=constants.DATA_PATH_STOCKS):
+    df = pd.read_csv(path_stocks+ativo+".csv", sep=constants.CSV_SEPARATOR)  
     return df
 
 
 
 ###############################################################
 
-def charge_b3_data(applyNormalization):
+def charge_b3_data(applyNormalization, path_stocks=constants.DATA_PATH_STOCKS, path_series=constants.DATA_PATH_SERIES):
+    if not os.path.exists(path_stocks):
+        os.mkdir(path_stocks)
     dfGlobal = pd.Series(dtype=float)
     for ativo in constants.STOCKS:
-        fname = constants.DATA_PATH+ativo+".csv"
+        fname = path_stocks+ativo+".csv"
         print("Processando Ativo:", ativo)
         if os.path.isfile(fname):
             dfAtivo = read_sotck_file(fname)
         else:
             if dfGlobal.size == 0:
                 for year in range (constants.DATA_YEAR_INIT, constants.DATA_YEAR_END):
-                    dfYear = read_data('COTAHIST_A'+str(year)+'.ZIP')
+                    dfYear = read_data('COTAHIST_A'+str(year)+'.ZIP', path_series)
                     #print(dfYear.describe())
                     if dfGlobal.size == 0:
                         dfGlobal = dfYear
@@ -175,13 +189,13 @@ def charge_b3_data(applyNormalization):
     
                 #dfGlobal = pd.concat([dfGlobal, df0, df1, df2])
             dfAtivo = extract_stock(dfGlobal, ativo)
-            dfAtivo.to_csv(constants.DATA_PATH+ativo+".csv", sep=constants.CSV_SEPARATOR, encoding='utf-8', index=False)
+            dfAtivo.to_csv(path_stocks+ativo+".csv", sep=constants.CSV_SEPARATOR, encoding='utf-8', index=False)
     
         df = calculate_indicators(dfAtivo, applyNormalization)
         #print(df)
-        fileOut = constants.DATA_PATH+ativo+"-ind.csv"
+        fileOut = path_stocks+ativo+"-ind.csv"
         if applyNormalization:
-            fileOut = constants.DATA_PATH+ativo+"-log-ind.csv"
+            fileOut = path_stocks+ativo+"-log-ind.csv"
             
     
         dfAtivo.to_csv(fileOut, sep=constants.CSV_SEPARATOR, encoding='utf-8', index=False)

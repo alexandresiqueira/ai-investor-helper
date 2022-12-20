@@ -29,7 +29,7 @@ stat = pd.DataFrame(columns=cols)
 
 
 def read_ativo(ativo):
-    cotacoes = pd.read_csv(constants.DATA_PATH+ativo+'-ind.csv',sep=constants.CSV_SEPARATOR)    
+    cotacoes = pd.read_csv(constants.DATA_PATH_STOCKS+ativo+'-ind.csv',sep=constants.CSV_SEPARATOR)    
     
     return cotacoes
 

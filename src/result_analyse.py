@@ -6,7 +6,7 @@ Script que apresenta gráficos de análise dos diversos modelos executados.
 
 As análises realizadas neste script dependem da existência do arquivo de resultados
 consolidado de todos ativos em:
-    constants.DATA_PATH+constants.FILE_NAME_RESULTADO
+    constants.DATA_PATH_RESULTS+constants.FILE_NAME_RESULTADO
 
 @author: Alexandre Siqueira de Medeiros
 @contact: alexandre.siqueira@gmailcom
@@ -30,7 +30,7 @@ pd.set_option('display.width', 1000)
 
 
 def read_resultado():
-    fname = constants.DATA_PATH+constants.FILE_NAME_RESULTADO
+    fname = constants.DATA_PATH_RESULTS+constants.FILE_NAME_RESULTADO
     
     if os.path.isfile(fname):
         resultado = pd.read_csv(fname, sep=constants.CSV_SEPARATOR)
@@ -113,7 +113,7 @@ def compute_bets_results():
                      kind='quicksort', na_position='last')
     print("\n##########################################  MÁXIMOS DESEMPENHOS POR ATIVO  ########################################\n")
     print(bestRes)
-    bestRes.to_excel(constants.DATA_PATH+"report-ativos.xlsx")
+    bestRes.to_excel(constants.DATA_PATH_RESULTS+"report-ativos.xlsx")
     
     bestRes2 = bestRes.agg({"SCO_TEST": ['mean', 'min', 'max', 'count'],"SCO_VALID": ['mean', 'min', 'max', 'count'], "% PRED/HOLD": ['mean', 'min', 'max', 'count']})
     print("\n########### MÉDIA GERAL DOS MELHORES RESULTADOS DE VALIDAÇÃO ##########")
@@ -130,7 +130,7 @@ def compute_bets_results():
         """
         print("\n\n############### MÉDIA GERAL DOS MELHORES RESULTADOS DE VALIDAÇÃO POR ",atrib," ##################")
         print(res3)
-        res3.to_excel(constants.DATA_PATH+"report-"+atrib+".xlsx")
+        res3.to_excel(constants.DATA_PATH_RESULTS+"report-"+atrib+".xlsx")
 
     bestRes2 = bestRes.groupby(["ALG", "LOG"]).agg({"SCO_TEST": ['mean', 'min', 'max', 'count'],"SCO_VALID": ['mean', 'min', 'max', 'count'], "% PRED/HOLD": ['mean', 'min', 'max', 'count']})
     print("\n\n######### MÉDIA GERAL DOS MELHORES RESULTADOS DE VALIDAÇÃO POR ALGORITMO E NORMALIZ. ##########")
@@ -162,7 +162,7 @@ def plot_ativo(resultado, ativo, normalized=constants.DEFAULT_NORMALIZED, test_s
     plt.suptitle("Acurácia dos algoritmos versus quantidade de atributos, para n períodos \n "+ativo+" - NORMALIZED:"+str(normalized)+"  - TEST SIZE:"+str(test_size))
     
     i = 0
-    for i in range(7):
+    for i in range(len(constants.ALGORITMS)):
         for per in constants.PERIODS_RESULTS:
             df1 = df.loc[(df["ALG"] == constants.ALGORITMS[i]) ]
             df1 = df1.loc[(df1["N_RES"] == per)]
@@ -469,19 +469,19 @@ def analyse_results():
 
         plot_resultado(res_ativo, period=constants.DEFAULT_PERIOD_RES, ativo=ativo)
         for t in constants.TRAIN_TEST_SPLIT_SIZES:
-            plot_ativo(res_ativo, ativo, True, t)
-            plot_ativo(res_ativo, ativo, False, t)
+            for norm in constants.NORMALIZE_OPTIONS:
+                plot_ativo(res_ativo, ativo, norm, t)
         break
     plot_global_result(res, "SCO_TEST")
     plot_global_result(res, "SCO_VALID")
 
 def main():
     print_res_alg()    
-    #compute_bets_results()
+    compute_bets_results()
     analyse_results()#gera histograma de SCO_TEST
     #plot_scatter(constants.DEFAULT_NORMALIZED, constants.DEFAULT_TEST_SIZE, read_resultado())
     #plot_scatter_balance(read_resultado(), constants.DEFAULT_NORMALIZED)
-    plot_boxplots(read_resultado(), normalized=None, test_size=None)    
+    #plot_boxplots(read_resultado(), normalized=None, test_size=None)    
 
 print("The value of __name__ is:", repr(__name__))
 if __name__ == "__main__":
