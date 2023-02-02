@@ -42,9 +42,18 @@ def read_last_serie():
     today       = date.today()
     year_today  = today.strftime("%Y")
     file        = 'COTAHIST_A'+year_today+'.ZIP'
+    file_name   = constants.PATH_B3_SERIES_LOCAL + file
+    if not os.path.isfile(file_name):
+        year_today = str(int(year_today)-1)
+        print("Reading SERIE ",year_today)
+    
+    file        = 'COTAHIST_A'+year_today+'.ZIP'
+    file_name   = constants.PATH_B3_SERIES_LOCAL + file
+
     df_serie    = coletor_b3.read_data(file, constants.PATH_B3_SERIES_LOCAL)
     return df_serie
-
+        
+    return None
 
 #Faz downlod dos arquivos intraday dos últimos 30 dias, caso não existam no sistema
 def download_intraday():
@@ -69,7 +78,7 @@ def download_intraday():
             print("FILE INTRADAY DOWNLOADED BEFORE:",day)
             continue
 
-        print("DOWNLOADING INTRADAY:",day)
+        print("DOWNLOADING INTRADAY:",day, " TO:", file_name)
         download(url, file_name)
 
 #Realiza o download da serie B3 de todos exercicios definidos entre constants.DATA_YEAR_INIT, constants.DATA_YEAR_END + 1
@@ -88,8 +97,14 @@ def download_series():
                   (year != int(year_today)), ";ress:",os.path.isfile(file_name) & (year != int(year_today)))
             continue
 
-        print("DOWNLOADING SERIE:",year)
+        print("DOWNLOADING SERIE:",year, " TO:", file_name)
         download(url, file_name)
+        
+        file_stats = os.stat(file_name)
+        if file_stats.st_size < 200:
+            print("Remove file (less than 200 bytes) ...", file_name)
+            os.remove(file_name)
+
 
 #Atualiza os arquivos contendo os dados dos ativos constants.STOCKS
 #return True se necessário atualizar indicadores de algum ativo
@@ -101,7 +116,7 @@ def update_stock_indicator_file():
 
     for ativo in constants.STOCKS:
         fname = constants.PATH_B3_TIMESERIES_DAY+ativo+".csv"
-        print("Processando Ativo:", ativo)
+        print("Processando Ativo:", ativo, "; file:", fname)
         
         if os.path.isfile(fname):
             df          = pd.read_csv(fname, sep=';')  
@@ -127,10 +142,8 @@ def main():
     download_intraday()
     update_data = update_stock_indicator_file()
     if update_data:
-        coletor_b3.charge_b3_data(applyNormalization=False, 
-                                  path_stocks=constants.PATH_B3_TIMESERIES_DAY, 
-                                  path_series=constants.PATH_B3_SERIES_LOCAL)
-        coletor_b3.charge_b3_data(applyNormalization=True, 
+        for applyNormalization in constants.NORMALIZE_OPTIONS:
+            coletor_b3.charge_b3_data(applyNormalization, 
                                   path_stocks=constants.PATH_B3_TIMESERIES_DAY, 
                                   path_series=constants.PATH_B3_SERIES_LOCAL)
         

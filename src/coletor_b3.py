@@ -20,7 +20,8 @@ import pandas as pd
 import ta
 import os.path
 import constants
-
+import linear_regression_indicator as lri
+import time
 
 #funcao responsavel por ler o arquivo e extrair os dados
 def read_data(file, path=constants.DATA_PATH_STOCKS):
@@ -84,77 +85,138 @@ def my_rolling_dif(x):
 def calculate_indicators(df, applyNormalization):
 
     df["close-orig"] = df["close"]
+    round_factor_0 = 0
+    round_factor_2 = 2
+    round_factor_4 = 4
     if applyNormalization:
         #print('>>>>>>>>>Normalizando os preços por LOGARITMO do ativo')
         df["open"] = np.log(df["open"])
         df["high"] = np.log(df["high"])
         df["low"] = np.log(df["low"])
         df["close"] = np.log(df["close"])
+        round_factor_0 = 4
+        round_factor_2 = 6
+        round_factor_4 = 8
 
     for period in constants.PERIODS_INDICATORS:
         trend_ema = ta.trend.EMAIndicator(close=df["close"], window=period)
-        df["EMA-"+str(period)] = trend_ema.ema_indicator()
+        df["EMA-"+str(period)] = round(trend_ema.ema_indicator(), round_factor_0)
         df["EMA-dist-"+str(period)] = df["EMA-"+str(period)] - df["close"]
 
-    for period in constants.PERIODS_INDICATORS:
+    #for period in constants.PERIODS_INDICATORS:
         trend_macd = ta.trend.MACD(close=df["close"], window_slow=period, 
                                    window_fast=period/2)
-        df["MACD-"+str(period)] = trend_macd.macd()
-        df["MACD-DIFF-"+str(period)] = trend_macd.macd_diff()
-        df["MACD-SIGNAL-"+str(period)] = trend_macd.macd_signal()
+        df["MACD-"+str(period)] = round(trend_macd.macd(), round_factor_2)
+        df["MACD-DIFF-"+str(period)] = round(trend_macd.macd_diff(), round_factor_2)
+        df["MACD-SIGNAL-"+str(period)] = round(trend_macd.macd_signal(), round_factor_2)
 
-    for period in constants.PERIODS_INDICATORS:
+    #for period in constants.PERIODS_INDICATORS:
         rsi = ta.momentum.RSIIndicator(close=df["close"], window=period)
-        df["RSI-"+str(period)] = rsi.rsi()
+        df["RSI-"+str(period)] = round(rsi.rsi(), round_factor_2)
 
-    for period in constants.PERIODS_INDICATORS:
+    #for period in constants.PERIODS_INDICATORS:
         so = ta.momentum.StochasticOscillator(high=df["high"], low=df["low"], 
                                               close=df["close"], window=period)
-        df["SO-"+str(period)] = so.stoch()
-        df["SOS-"+str(period)] = so.stoch_signal()
+        df["SO-"+str(period)] = round(so.stoch(), round_factor_2)
+        df["SOS-"+str(period)] = round(so.stoch_signal(), round_factor_2)
 
-    for period in constants.PERIODS_INDICATORS:
+    #for period in constants.PERIODS_INDICATORS:
         tsi = ta.momentum.TSIIndicator(close=df["close"], window_slow=period, 
                                        window_fast=period/2)
-        df.loc[:,"TSI-"+str(period)] = tsi.tsi()
+        df.loc[:,"TSI-"+str(period)] = round(tsi.tsi(), round_factor_2)
 
-    for period in constants.PERIODS_INDICATORS:
+    #for period in constants.PERIODS_INDICATORS:
         bb = ta.volatility.BollingerBands(close=df["close"], window=period)
-        df.loc[:,"BBH-"+str(period)] = bb.bollinger_hband()
+        df.loc[:,"BBH-"+str(period)] = round(bb.bollinger_hband(), round_factor_0)
         df.loc[:,"BBHI-"+str(period)] = bb.bollinger_hband_indicator()
-        df.loc[:,"BBL-"+str(period)] = bb.bollinger_lband()
+        df.loc[:,"BBL-"+str(period)] = round(bb.bollinger_lband(), round_factor_0)
         df.loc[:,"BBLI-"+str(period)] = bb.bollinger_lband_indicator()
-        df.loc[:,"BBP-"+str(period)] = bb.bollinger_pband() #percentual da banda 
+        df.loc[:,"BBP-"+str(period)] = round(bb.bollinger_pband(), round_factor_4) #percentual da banda 
             
-    for period in constants.PERIODS_INDICATORS:
+    #for period in constants.PERIODS_INDICATORS:
         fi = ta.volume.ForceIndexIndicator(close=df["close"], volume=df["volume"], window=period)
-        df.loc[:,"FI-"+str(period)] = fi.force_index()
-    """
-    for period in constants.PERIODS_INDICATORS:
-        obv = ta.volume.OnBalanceVolumeIndicator(close=df["close"], volume=df["volume"])
-        df.loc[:,"OBV-"+str(period)] = obv.on_balance_volume()
-
-    """
-    for period in constants.PERIODS_INDICATORS:
+        df.loc[:,"FI-"+str(period)] = round(fi.force_index(), round_factor_0)
+        
+        """
+        for period in constants.PERIODS_INDICATORS:
+            obv = ta.volume.OnBalanceVolumeIndicator(close=df["close"], volume=df["volume"])
+            df.loc[:,"OBV-"+str(period)] = obv.on_balance_volume()
+    
+        """
+    #for period in constants.PERIODS_INDICATORS:
         max_period = df['high'].rolling(period).max()
         min_period = df['low'].rolling(period).min()
         df["max-"+str(period)] = max_period
         df["min-"+str(period)] = min_period
-        df["fibo-ret-"+str(period)] = ((df["close"] - min_period)/ 
-                                       (max_period - min_period) ) * 100
+        df["fibo-ret-"+str(period)] = round(((df["close"] - min_period)/ 
+                                       (max_period - min_period) ) * 100, round_factor_2)
         
-    for period in constants.PERIODS_INDICATORS:
+    #for period in constants.PERIODS_INDICATORS:
         trend_ma = ta.trend.SMAIndicator(close=df["close"], window=period)
-        df["SMA-"+str(period)] = trend_ma.sma_indicator()
-        df["SMA-dist-"+str(period)] = df["SMA-"+str(period)] - df["close"]
+        a = pd.DataFrame(dtype=float)
+        a["SMA-"+str(period)] = round(trend_ma.sma_indicator(), round_factor_0)
+        a["SMA-dist-"+str(period)] = a["SMA-"+str(period)] - df["close"]
+        #df = pd.concat([df,a], axis=1)
+        
+    #for period in constants.PERIODS_INDICATORS:
+        #a = pd.DataFrame(dtype=float)
+        a["SMA-LREG-"+str(period)] = round(lri.lreg(a["SMA-"+str(period)], period), round_factor_4)
+        a["BBH-LREG-"+str(period)] = round(lri.lreg(df["BBH-"+str(period)], period), round_factor_4)
+        a["BBL-LREG-"+str(period)] = round(lri.lreg(df["BBL-"+str(period)], period), round_factor_4)
+        df = pd.concat([df,a], axis=1)
 
+        
     for period in constants.PERIODS_RESULTS:
         diff = df['close-orig'].rolling(period).apply(my_rolling_dif)
         df.loc[:,"res-"+str(period)] = diff.shift(-1*period + 1)
         df.loc[:,"res-positive-"+str(period)] = (diff.shift(-1*period + 1) > 0).astype(str)
-        df.loc[:,"res-perc-"+str(period)] = (df["res-"+str(period)]/df['close-orig'])*100
+        df.loc[:,"res-perc-"+str(period)] = round((df["res-"+str(period)]/df['close-orig'])*100, round_factor_2)
         
     return df
+
+def __read_stock(stock):
+    fname = constants.DATA_PATH_STOCKS+stock+".csv"
+    #print("Processando Ativo:", ativo, ";LOGARITM:",applyNormalization)
+    if os.path.isfile(fname):
+        dfAtivo = read_sotck_file(fname)
+    return dfAtivo
+
+
+def __read_stock_indicators(stock, applyNormalization):
+    fname = get_file_name_stock_indicator(stock, applyNormalization)
+    #print("Processando Ativo:", ativo, ";LOGARITM:",applyNormalization)
+    if os.path.isfile(fname):
+        dfAtivo = pd.read_csv(fname, sep=constants.CSV_SEPARATOR)
+    return dfAtivo
+
+
+
+#def add_data(data, stock, open, high, low, close, volume):
+def update_indicators(stock, path_stocks=constants.DATA_PATH_STOCKS):
+    
+    df          = __read_stock(stock)
+    for applyNormalization in constants.NORMALIZE_OPTIONS:
+        dfAtivoInd  = __read_stock_indicators(stock, applyNormalization)
+        
+        max_date    = (dfAtivoInd["data"].max())
+        
+        ##df = df.drop(len(df.index)-1, axis=0)####remover
+        df_ = df.loc[df["data"] > max_date]
+        if df_.shape[0] == 0:
+            print("STOCK:", stock, ";NORMALIZE:", applyNormalization, " UPDATED ")
+            continue
+    
+        periods = constants.PERIODS_INDICATORS.copy()
+        periods.sort(reverse=True)
+        dfN = df.loc[df.tail(2*periods[0] - 1).index].copy()
+        dfN = calculate_indicators(dfN, applyNormalization)
+        df_ = dfN.loc[dfN["data"] > max_date]
+        dfAtivoInd  = dfAtivoInd.append(df_)
+    
+        fileOut = get_file_name_stock_indicator(stock, applyNormalization, path_stocks)
+                
+        dfAtivoInd.to_csv(fileOut, sep=constants.CSV_SEPARATOR, encoding='utf-8', index=False)
+        print("saving ...:",fileOut)
 
 def read_sotck_file(fname):
     df = pd.read_csv(fname, sep=';')  
@@ -164,8 +226,11 @@ def read_stock_indicator_file(ativo, path_stocks=constants.DATA_PATH_STOCKS):
     df = pd.read_csv(path_stocks+ativo+".csv", sep=constants.CSV_SEPARATOR)  
     return df
 
-
-
+def get_file_name_stock_indicator(stock, applyNormalization, path_stocks=constants.DATA_PATH_STOCKS):
+    fileOut = path_stocks+stock+"-ind.csv"
+    if applyNormalization:
+        fileOut = path_stocks+stock+"-log-ind.csv"
+    return fileOut
 ###############################################################
 
 def charge_b3_data(applyNormalization, path_stocks=constants.DATA_PATH_STOCKS, path_series=constants.DATA_PATH_SERIES):
@@ -174,7 +239,7 @@ def charge_b3_data(applyNormalization, path_stocks=constants.DATA_PATH_STOCKS, p
     dfGlobal = pd.Series(dtype=float)
     for ativo in constants.STOCKS:
         fname = path_stocks+ativo+".csv"
-        print("Processando Ativo:", ativo)
+        print("Processando Ativo:", ativo, ";LOGARITM:",applyNormalization)
         if os.path.isfile(fname):
             dfAtivo = read_sotck_file(fname)
         else:
@@ -191,21 +256,29 @@ def charge_b3_data(applyNormalization, path_stocks=constants.DATA_PATH_STOCKS, p
             dfAtivo = extract_stock(dfGlobal, ativo)
             dfAtivo.to_csv(path_stocks+ativo+".csv", sep=constants.CSV_SEPARATOR, encoding='utf-8', index=False)
     
-        df = calculate_indicators(dfAtivo, applyNormalization)
-        #print(df)
-        fileOut = path_stocks+ativo+"-ind.csv"
-        if applyNormalization:
-            fileOut = path_stocks+ativo+"-log-ind.csv"
+        dfAtivo = calculate_indicators(dfAtivo, applyNormalization)
+        #print(dfAtivo.tail(1))
+        fileOut = get_file_name_stock_indicator(ativo, applyNormalization, path_stocks)
             
     
         dfAtivo.to_csv(fileOut, sep=constants.CSV_SEPARATOR, encoding='utf-8', index=False)
         
 #()
 def main():
-
+    
+    for stock in constants.STOCKS:
+        update_indicators(stock)
+    """
     charge_b3_data(applyNormalization = True)
     charge_b3_data(applyNormalization = False)
-
+    """
+    
 print("The value of __name__ is:", repr(__name__))
 if __name__ == "__main__":
+    init = time.time()
+    print(init)
     main()    
+    end = time.time()
+    print(end)
+    print("elapsed seconds:", int(end - init))
+    

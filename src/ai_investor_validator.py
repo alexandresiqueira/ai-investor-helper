@@ -48,6 +48,7 @@ def read_data_predic_and_compare(ativo, res_ativo_sorted, by_criteria, n_period_
 def calc_buy_and_hold(dfStock, init_balance, col_close_name="close-orig"):    
     close_init = dfStock[col_close_name].iloc[0]
     quant_stock = init_balance / close_init
+    #print("data:",dfStock["data"].iloc[0], ";close:",close_init)
     dfStock["bal-hold"] = dfStock[col_close_name] * quant_stock
     return dfStock
 

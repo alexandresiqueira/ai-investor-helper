@@ -119,13 +119,39 @@ def prepare_for_fit(cotacoes, ativo, n_periods, normalize, n_periods_result, dt_
     return cotacoes    
 
 
+
+
+
 #A partir dos dados de um ativo contendo todos indicadores, remove atributos e 
 # indicadores referentes a períodos maiores que n_periods os quais 
 # não serão utilizados e mantém apenas o atributo da classe a ser inferida de acordo 
 # com o período de retorno definido em n_periods_result
 def adjust_technical_indicators(ativo, n_periods, normalize, n_periods_result, 
                                 cotacoes):
+    res           = constants.ATRIBS_ORIG
+    count_periods = 0
+    
+    for per in constants.PERIODS_INDICATORS:
+        count_periods = count_periods + 1        
+            
+        if count_periods <= n_periods:
+            
+            for i in range(len(constants.ATRIBS_PER)):
+                atrib = constants.ATRIBS_PER[i]
+                atrib = atrib + "-" + str(per)
+                res = res + [atrib]
+                
+    res = res + [atrib] + ["res-positive-"+str(n_periods_result)]
+    cotacoes2 = cotacoes[res].copy()
+    #print(cotacoes2.head(1))
+    cotacoes2["res-positive-"+str(n_periods_result)] = cotacoes2["res-positive-"+str(n_periods_result)].astype(str)
+    
+    cotacoes2.to_csv(constants.DATA_PATH_STOCKS+ativo+str(normalize)+"-train.csv", sep=constants.CSV_SEPARATOR, encoding='utf-8', index=False)
+    #print(cotacoes2.info())
+    return cotacoes2
 
+def __adjust_technical_indicators_old(ativo, n_periods, normalize, n_periods_result, 
+                                    cotacoes):
     count_periods = 0
     for period in constants.PERIODS_RESULTS:
         cotacoes = cotacoes.drop("res-"+str(period), axis=1)
@@ -153,6 +179,9 @@ def adjust_technical_indicators(ativo, n_periods, normalize, n_periods_result,
             cotacoes = cotacoes.drop("FI-"+str(period), axis=1)
             cotacoes = cotacoes.drop("EMA-"+str(period), axis=1)
             cotacoes = cotacoes.drop("EMA-dist-"+str(period), axis=1)
+            cotacoes = cotacoes.drop("SMA-LREG-"+str(period), axis=1)
+            cotacoes = cotacoes.drop("BBH-LREG-"+str(period), axis=1)
+            cotacoes = cotacoes.drop("BBL-LREG-"+str(period), axis=1)
             
         cotacoes = cotacoes.drop("min-"+str(period), axis=1)
         cotacoes = cotacoes.drop("max-"+str(period), axis=1)
@@ -253,8 +282,8 @@ def fit_and_predict(X_train, X_test, y_train, y_test, clf, cotacoes, ativo,
 
     balanceValidPred = X_validation["bal-pred-"+str(n_periods_result)].iloc[X_validation.shape[0]-1]
     acc_score_valid  = accuracy_score(y_valid, y_pred_validation)
-    
-    cnf_matrix_valid = confusion_matrix(y_valid, y_pred_validation)
+    cnf_matrix_valid = confusion_matrix(y_valid, y_pred_validation, labels=[0,1]) #le.transform(le.classes_))
+
     support0_valid   = (cnf_matrix_valid[0,0] + cnf_matrix_valid[0,1])
     support1_valid    = (cnf_matrix_valid[1,1] + cnf_matrix_valid[1,0])
     #print("support0:",support0,";support1:",support1)
@@ -303,7 +332,7 @@ def process_ativo(cotacoes, ativo, n_per_features, normalize, n_per_result,
         print("---------------------------------------")
         print(clfs["NAME_CLASSIFIER"].iloc[i])
         id_clf = clfs["ID_CLASSIFIER"].iloc[i]
-        #print("---------------------------------------")
+        #print(cotacoesValidation.shape)
         resDf = fit_and_predict(X_train, X_test, y_train, y_test, clfs["CLASSIFIER"].iloc[i], 
                                 cotacoes, ativo, class_names, id_clf,
                                 n_per_features, normalize, n_per_result, test_size, 
