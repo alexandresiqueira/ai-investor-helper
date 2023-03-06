@@ -132,6 +132,10 @@ def calculate_indicators(df, applyNormalization):
         df.loc[:,"BBL-"+str(period)] = round(bb.bollinger_lband(), round_factor_0)
         df.loc[:,"BBLI-"+str(period)] = bb.bollinger_lband_indicator()
         df.loc[:,"BBP-"+str(period)] = round(bb.bollinger_pband(), round_factor_4) #percentual da banda 
+        
+        #df.loc[:,"BBH-dist-"+str(period)] = df["BBH-"+str(period)] - df["close"]
+        #df.loc[:,"BBL-dist-"+str(period)] = df["close"] - df["BBL-"+str(period)]
+        df.loc[:,"BBH-BBL-dist-"+str(period)] = df["BBH-"+str(period)] - df["BBL-"+str(period)]
             
     #for period in constants.PERIODS_INDICATORS:
         fi = ta.volume.ForceIndexIndicator(close=df["close"], volume=df["volume"], window=period)
@@ -163,6 +167,7 @@ def calculate_indicators(df, applyNormalization):
         a["SMA-LREG-"+str(period)] = round(lri.lreg(a["SMA-"+str(period)], period), round_factor_4)
         a["BBH-LREG-"+str(period)] = round(lri.lreg(df["BBH-"+str(period)], period), round_factor_4)
         a["BBL-LREG-"+str(period)] = round(lri.lreg(df["BBL-"+str(period)], period), round_factor_4)
+        a["SO-LREG-"+str(period)] = round(lri.lreg(df["SO-"+str(period)], period), round_factor_4)
         df = pd.concat([df,a], axis=1)
 
         

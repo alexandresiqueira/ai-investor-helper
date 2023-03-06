@@ -15,7 +15,7 @@ import constants
 
 pd.set_option('display.max_columns', 700)
 pd.set_option('display.max_rows', 500)
-pd.set_option('precision', 8)
+#pd.set_option('precision', 8)
 pd.set_option('display.width', 1000)
 
 def __rolling_log_reg(rol_df):

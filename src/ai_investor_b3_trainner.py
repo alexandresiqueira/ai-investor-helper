@@ -72,6 +72,7 @@ def create_classifiers():
     lreg    = LogisticRegression(max_iter=10000)
     dtc3    = DecisionTreeClassifier(random_state=0, criterion='entropy', max_depth=3)
     dtc6    = DecisionTreeClassifier(random_state=0, criterion='entropy', max_depth=6)
+    dtc12   = DecisionTreeClassifier(random_state=0, criterion='entropy', max_depth=12)
     rdc     = RandomForestClassifier()
     gnb     = GaussianNB()
     svmc    = svm.SVC(C=1)
@@ -86,6 +87,8 @@ def create_classifiers():
             clfs.loc[len(clfs.index)] = [dtc3, "DTC3", "Arvore de Decisão - 3"]
         elif algo == "DTC6":
             clfs.loc[len(clfs.index)] = [dtc6, "DTC6", "Arvore de Decisão - 6"]
+        elif algo == "DTC12":
+            clfs.loc[len(clfs.index)] = [dtc12, "DTC12", "Arvore de Decisão - 12"]
         elif algo == "RFC":
             clfs.loc[len(clfs.index)] = [rdc, "RFC", "Arvore de Decisão - Random Forest"]
         elif algo == "GNB":
@@ -355,6 +358,7 @@ def exec_stock_train(ativo, normalize, n_per, n_per_result, test_size, resDf):
     #ler todos registros
     cotacoes = read_file_stock_and_adjust(ativo, n_periods = n_per+1, normalize=normalize, 
                    n_periods_result=n_per_result)#ler todos registros
+
     cotacoesValidation = cotacoes.loc[(cotacoes["data"] > constants.DATA_TRAIN_DATE_END)].copy()
     df = ai_investor_validator.calc_buy_and_hold(cotacoesValidation, constants.DEFAULT_INIT_BALANCE)
 
