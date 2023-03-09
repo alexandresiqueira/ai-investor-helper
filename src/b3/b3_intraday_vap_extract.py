@@ -95,7 +95,9 @@ def main():
     stocks = ["WDOJ23", "WINJ23"]
     number_top=10
     round_price=False
-    day = "20230301" #None
+    day = None
+    if day == None:
+        day = calc_last_day()
     d = calc_top_volume_day(stocks, day, number_top, round_price)
 
     print(d)

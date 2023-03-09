@@ -44,6 +44,7 @@ DATA_TRAIN_DATE_END=20230101
 
 DEFAULT_INIT_BALANCE=10000
 ROOT_PATH="D:/data/b3/"
+ROOT_PATH="C:/Alexandre/data/b3/"
 #ROOT_PATH="../data/"
 DATA_PATH=ROOT_PATH
 DATA_PATH_RESULTS=DATA_PATH+"results/"
@@ -76,9 +77,9 @@ URL_GET_COMPANIES="https://sistemaswebb3-listados.b3.com.br/listedCompaniesProxy
 URL_DOWNLOAD_B3="https://bvmf.bmfbovespa.com.br/InstDados/SerHist/"
 URL_INTRADAY_DOWNLOAD = "https://arquivos.b3.com.br/apinegocios/tickercsv/"
 
-PATH_B3_INTRADAY_LOCAL = "D:/data/b3/intraday/"
-PATH_B3_SERIES_LOCAL = "D:/data/b3/series/"
-PATH_B3_TIMESERIES_DAY = "D:/data/b3/timeseries/day/sup/"
+PATH_B3_INTRADAY_LOCAL = ROOT_PATH+"intraday/"
+PATH_B3_SERIES_LOCAL = ROOT_PATH+"series/"
+PATH_B3_TIMESERIES_DAY = ROOT_PATH+"timeseries/day/sup/"
 FILE_INTRADAY_PREFIX = "TradeIntraday_"
 TIMEFRAMES = [1, 2, 5, 15, 30]
 

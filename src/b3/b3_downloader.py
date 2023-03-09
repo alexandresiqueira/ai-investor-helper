@@ -72,7 +72,7 @@ def isBeforeMinHourToDownload():
 def download_intraday():
     today = date.today()
         
-    start_date = today + datetime.timedelta(days=-30)
+    start_date = today + datetime.timedelta(days=-3)
     
     for int_day in range(32):
         
@@ -160,7 +160,7 @@ def update_stock_indicator_file():
 
     
 def main():
-    download_series()    
+    #download_series()    
     download_intraday()
     update_data = update_stock_indicator_file()
     if update_data:

@@ -14,7 +14,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 from bs4 import BeautifulSoup
-
+import socket
 import codecs
 import json
 import re
@@ -45,46 +45,52 @@ SYMBOL_USD_BRL = 2103
 SYMBOL_USD_EUR = 2124
 SYMBOL_EUR_USD = 1
 SYMBOL_DX = 8827
-
+dict_symbols = {SYMBOL_BRL_USD: "BRL/USD",SYMBOL_USD_BRL:"USD/BRL", SYMBOL_USD_EUR:"USD/EUR", SYMBOL_DX:"DX"}
 installDriver=False
+
+days_history_standard=90
+
 
 #driver = None
 #wait = None
 
 #def __prepare_web_driver():
+    
+    
+#from fake_useragent import UserAgent
+#user_agent = 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.2 (KHTML, like Gecko) Chrome/22.0.1216.0 Safari/537.2'
+#chrome_options = webdriver.ChromeOptions()
+#chrome_options.add_argument(f'user-agent={user_agent}')
+#driver = webdriver.Chrome(executable_path = f"your_path",chrome_options=chrome_options)
+
+    
 def __req_data(val):
     chrome_options = Options()
     chrome_options.add_argument("--headless")
+    user_agent = 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.2 (KHTML, like Gecko) Chrome/22.0.1216.0 Safari/537.2'
+    #chrome_options = webdriver.ChromeOptions()
+    chrome_options.add_argument(f'user-agent={user_agent}')
     if installDriver:
         driver=webdriver.Chrome(service=Service(ChromeDriverManager().install()), chrome_options=chrome_options)
     else:
-        driver=webdriver.Chrome()
-    
-    #val = "https://tvc4.investing.com/285ea8f8f1ddd7b0f74c5f9bbe0ae7e2/0/0/0/0/history?symbol=2103&resolution=1&from=1677873442&to=1677878600"
+        driver=webdriver.Chrome(options=chrome_options)
+    #driver.set_window_size(200, 200)
     
     #wait = WebDriverWait(driver, 10)
-    wait = WebDriverWait(driver, 2)
+    wait = WebDriverWait(driver, 10)
 
-    #if (driver == None ) | (wait == None):
-     #   print("preparing DRIVER....")
-      #  __prepare_web_driver()
         
     driver.get(val)
     
     print("requesting.....:",val)
     get_url = driver.current_url
     wait.until(EC.url_to_be(val))
-    #wait(10000)
-    #print("esperou...")
-    #print("antes")
+
     if get_url == val:
     
-        #print("executou URL..........")
-        #print(get_url)
-        #print("PAGE SOURCE:")
         resp = driver.page_source
         #print("PAGE SOURCE END:", resp)
-        #driver.quit()
+        driver.quit()
         #print("url..........END")
         return resp
     #print("depois")
@@ -100,6 +106,10 @@ def __mount_url(symbol, resolution, time_from, time_to):
 
 def __save_currency_history(pair, resolution, df, path_pair=constants.DATA_PATH_CURRENCY):
     df.to_csv(path_pair+str(pair)+"-"+str(resolution)+".csv", sep=constants.CSV_SEPARATOR, index=False)
+
+def __save_currency_percent_history(pair, resolution, df, path_pair=constants.DATA_PATH_CURRENCY):
+    df.to_csv(path_pair+str(pair)+"-"+str(resolution)+"-percent.csv", sep=constants.CSV_SEPARATOR, index=False)
+
     
 def read_currency_history(pair, resolution, path_pair=constants.DATA_PATH_CURRENCY):
     fname = path_pair+str(pair)+"-"+str(resolution)+".csv"
@@ -149,11 +159,11 @@ def load_history(symbol, resolution=60, days_before_from=3, days_before_to=2, ho
 
 def load_history_ts(symbol, resolution, time_from, time_to):
     url = __mount_url(symbol, resolution,  time_from,  time_to)
-    print("1 - ##################################PAIR:",symbol, " - RESOLUTION:", resolution)
+    #print("1 - ##################################PAIR:",ticker_to_string(symbol), " - TIMEFRAME:", resolution)
     resp = __req_data(url)
     #print("2 - ##################################",symbol)
     df2 = __get_history_data(resp)
-    print("4 - ##################################",symbol)
+    #print("4 - ##################################",ticker_to_string(symbol))
     return df2
 
 def load_tick_code(pair="USD/BRL"):
@@ -172,20 +182,70 @@ def calc_percent_from(df, time_start):
     df['perc'] = 100*((df['c']/value_ref)-1)
     return df
 
+
+
+
+
 def calc_percent(dfx, hour_ref, minute_ref):
+    #df = df.loc[(df['t'] >= time_start)].copy()
+    #df['time'] = datetime.datetime.fromtimestamp(df['t'])
+    df = dfx.copy()
+    df['perc'] = 0
+    df['value-ref'] = -1
+    t0 = df.iloc[0]['t']
+    
+    t1 = 0
+    t_fim = df.iloc[df.shape[0]-1]['t']
+    dt = datetime.datetime.fromtimestamp(t0)
+    t0 = t0 - dt.hour*60*60 - dt.minute*60
+    t0 = t0 + hour_ref*60*60 + minute_ref*60
+    dfT = df.loc[(df['t']<= t0)]
+    #print("shape:",dfT.shape[0])
+    value_ref = 0
+    if dfT.shape[0] > 0:
+        value_ref = dfT.iloc[dfT.shape[0]-1]['c']
+    #t_init = t0
+    t1 = t0 + 24*60*60 #+ hour_ref*60*60 + minute_ref*60
+    
+    #print("INICIO CALC:",t0, ";", t1, ";", t_fim, ";dtfim:",datetime.datetime.fromtimestamp(t_fim), ";value_ref:", value_ref)
+    while t0 < t_fim:
+        #print("INCIO DIA:",t0, ";dt0:",datetime.datetime.fromtimestamp(t0), ";", t1, ";dt1:",datetime.datetime.fromtimestamp(t1))
+        dfT = df.loc[((df['t'] >= t0) & (df['t'] <= t1))]
+        df.loc[dfT.index, 'value-ref'] = value_ref
+
+        dt1 = datetime.datetime.fromtimestamp(t1)
+
+        if (dt1.weekday() != 5) & (dt1.weekday() != 6) & (dfT.shape[0] > 0):
+            #print("shape DFT:",dfT.shape[0], ";date:", dt1)
+            value_ref = dfT.iloc[dfT.shape[0]-1]['c']
+        
+        t0 = t1
+        t1 = t0 + 24*60*60 
+
+        dfT = df.loc[((df['t'] >= t0) & (df['t'] <= t1))]
+
+        df.loc[dfT.index, 'value-ref'] = value_ref
+
+    df['perc'] = 100*((df['c']/df['value-ref'])-1)
+
+    return df
+    
+def calc_percent2(dfx, hour_ref, minute_ref):
     #df = df.loc[(df['t'] >= time_start)].copy()
     #df['time'] = datetime.datetime.fromtimestamp(df['t'])
     df = dfx.copy()
     value_ref = 0
     df['perc'] = 0
     df['value-ref'] = -1
-    print("shape:",df.shape[0])
+    #print("shape:",df.shape[0])
     for i in range(df.shape[0]):
         timest = df['t'].iloc[i]
         tm = datetime.datetime.fromtimestamp(timest)       
         if ((tm.hour == hour_ref) & (tm.minute == minute_ref)):
             
             value_ref = df['c'].iloc[i]
+            #print(df.iloc[i])
+            #print("Identificou ref:",df['date_time'].iloc[i] , ";value_ref:",value_ref)
         if value_ref == 0:
             continue
         df['value-ref'].iloc[i] = value_ref
@@ -205,7 +265,7 @@ def calc_percent(dfx, hour_ref, minute_ref):
 
     return df
 
-def get_and_save_pair(pair, resolution, days_before_from=90):
+def get_and_save_pair(pair, resolution, days_before_from=days_history_standard):
     df1 = load_history(pair, resolution, days_before_from=days_before_from, days_before_to=0, hour_start=0)
     print(df1.shape)
     shape = df1.shape[0]
@@ -224,6 +284,7 @@ def get_and_save_pair(pair, resolution, days_before_from=90):
 
 def check_pairs(pairs, resolution):
     for pair in pairs:
+        print("\n########################## INIT CHECK UPDATE - ",ticker_to_string(pair)," - TIMEFRAME["+resolution+"] ########################## - ", datetime.datetime.now())
         check_pair(pair, resolution)
         
 def check_pair(pair, resolution):        
@@ -243,18 +304,24 @@ def check_pair(pair, resolution):
             print("CHECK for pair [", pair, "] weekend waiting ...")
         
         else:
-            df2     = load_history_ts(pair, resolution, time_from=last_t+1, time_to = __get_timestamp(days_before=0, hour=23, minute=59, second=59))
+            df2     = load_history_ts(pair, resolution, time_from=last_t, time_to = __get_timestamp(days_before=0, hour=23, minute=59, second=59))
             print("CHECK for pair [", pair, "] data retried:", df2.shape[0])
-            if df.shape[0] > 0:
+            if df2.shape[0] > 0:
                 #df     = df.append(df2)
                 #df = pd.concat(df, df2)
+                if (df.iloc[df.shape[0]-1]['t'] == df2.iloc[0]['t']):
+                    #print("cortando...")
+                    #print(df.tail(2))
+                    df = df.drop(df.shape[0]-1, axis=0)
+                    #print(df.tail(2))
                 df = pd.concat([df,df2], axis=0)
+                #print(df.tail(2))
                 print("CHECK for pair [", pair, "] saving resolution [",resolution,"]")
                 __save_currency_history(pair, resolution, df)
                 return True
     return False
 
-def __check_date(pair, resolution):
+def __check_data(pair, resolution):
     df = read_currency_history(pair, resolution)
     print(df.tail(15))
     #df['date_time'] = pd.to_datetime(df.t, unit='s') - pd.Timedelta(time_delta)
@@ -266,28 +333,32 @@ def __check_date(pair, resolution):
     __save_currency_history(pair, resolution, df)
 
 
-def check_for_updates(use_random=False):
-    for time_frame in resolutions:
-        if use_random:
-            sleep_seconds = random.randint(10, 25)
-            print("Waiting .... [",sleep_seconds,"] seconds", datetime.datetime.now())
-            time.sleep(sleep_seconds)
-        check_pairs(pairs, time_frame)
+def check_for_updates(time_frame, use_random=False):
+    if use_random:
+        sleep_seconds = random.randint(10, 25)
+        print("Waiting .... [",sleep_seconds,"] seconds", datetime.datetime.now())
+        time.sleep(sleep_seconds)
+    check_pairs(pairs, time_frame)
+
 #########################################################################
 #load_tick_code("EUR/USD")
 #load_history("USD/BRL")
 #df = load_history(SYMBOL_USD_BRL)
-resolutions = ["1"]#,"5","15","30","60"]#,"D","W","M"]
+path_percent_file_dir="C:/Users/ccgov/AppData/Roaming/MetaQuotes/Terminal/Common/Files/"
+resolutions = ["1","5","15"]#,"30","60","D"]#,"30","60"]#,"D","W","M"]
 time_delta  = '00:00:00'
 resolution  = "1"
 hour_ref    = 17
 minute_ref  = 30
+days_calc_percent=10
 hour_open_mkt = 8 + 3 ##consider tmizone diff
-#pairs       = [SYMBOL_USD_EUR, SYMBOL_USD_BRL, SYMBOL_DX]
-pairs       = [SYMBOL_USD_EUR]
-sleep_seconds = 15
+hour_close_mkt = 18 + 3 ##consider tmizone diff
+pairs       = [SYMBOL_USD_EUR, SYMBOL_USD_BRL, SYMBOL_DX]
+#pairs       = [SYMBOL_USD_EUR, SYMBOL_USD_BRL]
+#pairs       = [SYMBOL_USD_EUR, SYMBOL_DX]
+#pairs       = [SYMBOL_USD_EUR]
+sleep_seconds = 10
 #for pair in pairs:
-#__check_date(pairs[0], resolution)
 
 def get_resolution_minutes(resolution):
     if resolution == "D":
@@ -298,30 +369,52 @@ def get_resolution_minutes(resolution):
         return 30*24*60
     return int(resolution)
 
+def ticker_to_string(ticker):
+    return str(ticker) + " - "+ dict_symbols[ticker]
 
-cont = 0
-while cont < 1:
-    cont = cont + 1
+def exec_update():
+    cont = 0
+    max_req = 50
     
-    check_for_updates()
-    for pair in pairs:
-        print('reading:', cont)
-        ts_init = __get_timestamp(days_before=4, hour=0)
-        df = read_currency_history(pair, resolution)
-        df2 = df.loc[(df['t']>ts_init)].copy()
-        df2['perc'] = 0
-        df2['value-ref'] = -1
+    while cont < max_req:
+        cont = cont + 1
+        for resol in resolutions:        
+            #check_for_updates(resol)
+            
+            print('reading:', cont, " from:", max_req)
+            for pair in pairs:
+                try:
+                    check_pair(pair, resol)
+                    ts_init = __get_timestamp(days_before=days_calc_percent, hour=0)
+                    df = read_currency_history(pair, resol)
+                    df2 = df.loc[(df['t']>ts_init)].copy()
+            
+                    df2 = calc_percent(df2, hour_ref, minute_ref)
+                    #df = df.loc[(df['date_time'].dt.hour == 21) | (df['date_time'].dt.hour == 11)]
+                    print("\n\n################################## LAST - ",ticker_to_string(pair)," - TIMEFRAME["+resol+"] ##################################")
+                    print(df2.tail(10)) 
+                    __save_currency_percent_history(pair, resol, df2, path_percent_file_dir)
+                    #df2 = df2.loc[(df['date_time'].dt.hour == hour_open_mkt) & (df2['date_time'].dt.minute == (60 - get_resolution_minutes(resol)))]
+                    print("################################## OPEN - ",ticker_to_string(pair)," - TIMEFRAME["+resol+"] ##################################")
+                    print(df2.tail(3))
+                    """df2 = df2.loc[( (df['date_time'].dt.hour >= hour_open_mkt) &
+                                    (df['date_time'].dt.hour < hour_close_mkt) ) 
+                                  | ((df['date_time'].dt.hour == hour_close_mkt) & (df['date_time'].dt.minute < 30)  & (df['date_time'].dt.weekday != 6) & (df['date_time'].dt.weekday != 5))
+                                  
+                                  ]
+                    __save_currency_percent_history(pair, resol, df2, "C:/Users/ccgov/AppData/Roaming/MetaQuotes/Terminal/Common/Files/")
+                """
+                except PermissionError:
+                    print("ALERT: Erro de permissao, ", pair, "resol:",resolution)
+                except socket.timeout:
+                    print("ALERT: Erro de TimeoutException, ", pair, "resol:",resolution)
+        
+        print("Waiting .... [",sleep_seconds,"] seconds", datetime.datetime.now())
+        
+        if cont != (max_req):
+            time.sleep(sleep_seconds)
 
-        df2 = calc_percent(df2, hour_ref, minute_ref)
-        #df = df.loc[(df['date_time'].dt.hour == 21) | (df['date_time'].dt.hour == 11)]
-        print(df2.tail(10))
-        res_int = 0
-        df2 = df2.loc[(df['date_time'].dt.hour == hour_open_mkt) & (df2['date_time'].dt.minute == (60 - get_resolution_minutes(resolution)))]
-        print(df2.tail(10))
-    
-    print("Waiting .... [",sleep_seconds,"] seconds", datetime.datetime.now())
 
-    time.sleep(sleep_seconds)
 
 """
 df1 = load_history(SYMBOL_USD_EUR, resolution, days_before_from=3, days_before_to=2, hour_start=17)
@@ -351,3 +444,12 @@ dfx['spread'] = dfx['perc-1'] - dfx['perc-2']
 """
 #print(df.head(80))
 # print(dfx.head(240))
+
+
+if __name__ == "__main__":
+    init = time.time()
+    #__check_data(pairs[0], resolution)
+    #__check_data(pairs[1], resolution)
+    exec_update()    
+    end = time.time()
+    print("elapsed seconds:", int(end - init))
