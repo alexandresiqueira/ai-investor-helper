@@ -2,7 +2,8 @@
 """
 Created on Sat Mar  4 10:16:29 2023
 
-@author: ccgov
+@author: Alexandre Siqueira de Medeiros
+@contact: alexandre.siqueira@gmailcom
 """
 
 from selenium import webdriver
@@ -19,6 +20,7 @@ import codecs
 import json
 import re
 import pandas as pd
+import ta
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
 from datetime import date
@@ -90,7 +92,7 @@ def __req_data(val):
     
         resp = driver.page_source
         #print("PAGE SOURCE END:", resp)
-        driver.quit()
+        #driver.quit()
         #print("url..........END")
         return resp
     #print("depois")
@@ -345,19 +347,20 @@ def check_for_updates(time_frame, use_random=False):
 #load_history("USD/BRL")
 #df = load_history(SYMBOL_USD_BRL)
 path_percent_file_dir="C:/Users/ccgov/AppData/Roaming/MetaQuotes/Terminal/Common/Files/"
-resolutions = ["1","5","15"]#,"30","60","D"]#,"30","60"]#,"D","W","M"]
+resolutions = ["1","5","15","30","60","D","W","M"]
 time_delta  = '00:00:00'
 resolution  = "1"
 hour_ref    = 17
-minute_ref  = 30
-days_calc_percent=10
+minute_ref  = 0
+days_calc_percent=60
 hour_open_mkt = 8 + 3 ##consider tmizone diff
 hour_close_mkt = 18 + 3 ##consider tmizone diff
 pairs       = [SYMBOL_USD_EUR, SYMBOL_USD_BRL, SYMBOL_DX]
 #pairs       = [SYMBOL_USD_EUR, SYMBOL_USD_BRL]
 #pairs       = [SYMBOL_USD_EUR, SYMBOL_DX]
 #pairs       = [SYMBOL_USD_EUR]
-sleep_seconds = 10
+sleep_seconds = 15
+max_req = 1
 #for pair in pairs:
 
 def get_resolution_minutes(resolution):
@@ -374,7 +377,6 @@ def ticker_to_string(ticker):
 
 def exec_update():
     cont = 0
-    max_req = 50
     
     while cont < max_req:
         cont = cont + 1
@@ -390,11 +392,18 @@ def exec_update():
                     df2 = df.loc[(df['t']>ts_init)].copy()
             
                     df2 = calc_percent(df2, hour_ref, minute_ref)
+
+                    trend_ma = ta.trend.SMAIndicator(close=df2["perc"], window=5)
+                    df2["perc-5"] = round(trend_ma.sma_indicator(), 6)
+                    trend_ma = ta.trend.SMAIndicator(close=df2["perc"], window=20)
+                    df2["perc-20"] = round(trend_ma.sma_indicator(), 6)
+
+                    
                     #df = df.loc[(df['date_time'].dt.hour == 21) | (df['date_time'].dt.hour == 11)]
                     print("\n\n################################## LAST - ",ticker_to_string(pair)," - TIMEFRAME["+resol+"] ##################################")
-                    print(df2.tail(10)) 
+                    print(df2.tail(20)) 
                     __save_currency_percent_history(pair, resol, df2, path_percent_file_dir)
-                    #df2 = df2.loc[(df['date_time'].dt.hour == hour_open_mkt) & (df2['date_time'].dt.minute == (60 - get_resolution_minutes(resol)))]
+                    df2 = df2.loc[(df['date_time'].dt.hour == hour_open_mkt) & (df2['date_time'].dt.minute == (60 - get_resolution_minutes(resol)))]
                     print("################################## OPEN - ",ticker_to_string(pair)," - TIMEFRAME["+resol+"] ##################################")
                     print(df2.tail(3))
                     """df2 = df2.loc[( (df['date_time'].dt.hour >= hour_open_mkt) &
